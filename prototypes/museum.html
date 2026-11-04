@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ACERVO — Catálogo de Obras & Episódios</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --border: #000000;
+      --muted: #666666;
+      --subtle: #f4f4f4;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-mono {
+      font-family: "Space Mono", monospace;
+    }
+    .brutalist-border {
+      border: 1px solid #000000;
+    }
+    .brutalist-border-b {
+      border-bottom: 1px solid #000000;
+    }
+    .brutalist-border-t {
+      border-top: 1px solid #000000;
+    }
+    .brutalist-border-r {
+      border-right: 1px solid #000000;
+    }
+    .stamp {
+      display: inline-block;
+      border: 1.5px solid #000000;
+      padding: 2px 8px;
+      font-family: "Space Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .stamp-watched {
+      background: #000000;
+      color: #ffffff;
+    }
+    /* Clean image grain and grayscale hover effect */
+    .poster-art {
+      transition: filter 0.3s ease, transform 0.3s ease;
+      filter: grayscale(100%) contrast(108%);
+    }
+    .poster-card:hover .poster-art {
+      filter: grayscale(0%) contrast(100%);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-white text-black selection:bg-black selection:text-white">
+
+  <!-- TOP HEADER / MUSEUM BANNER -->
+  <header class="brutalist-border-b bg-white sticky top-0 z-40">
+    <!-- Top Registry Bar -->
+    <div class="px-4 lg:px-8 py-2 brutalist-border-b text-[10px] font-mono flex flex-wrap items-center justify-between gap-2 uppercase tracking-widest bg-[#fafafa]">
+      <div class="flex items-center gap-4">
+        <span>ARCHIVE REF. // TV-2026</span>
+        <span class="hidden sm:inline">INDEXAÇÃO CRÍTICA DE EPISÓDIOS</span>
+      </div>
+      <div class="flex items-center gap-6">
+        <span>TEMPO REGISTRADO: <strong id="header-lifetime">34D 14H 22M</strong></span>
+        <a href="index.html" class="underline hover:bg-black hover:text-white px-1 py-0.5 transition-colors">
+          [ ALTERNAR PARA MODO DARK ]
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <div class="px-4 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <a href="#" onclick="setSection('acervo')" class="block">
+          <h1 class="text-3xl lg:text-4xl font-black tracking-tighter uppercase leading-none">
+            ACERVO
+          </h1>
+          <p class="text-xs font-mono tracking-widest text-[#666666] uppercase mt-1">
+            Registro Seriado & Galeria de Episódios
+          </p>
+        </a>
+      </div>
+
+      <!-- Essential Navigation Items -->
+      <nav class="flex items-center gap-0 text-xs font-mono uppercase tracking-wider">
+        <button id="nav-acervo" onclick="setSection('acervo')" class="nav-btn px-4 py-2 brutalist-border bg-black text-white">
+          01. Em Exibição (<span id="count-in-progress">4</span>)
+        </button>
+        <button id="nav-registro" onclick="setSection('registro')" class="nav-btn px-4 py-2 brutalist-border border-l-0 hover:bg-black hover:text-white transition-colors">
+          02. Diário
+        </button>
+        <button id="nav-indice" onclick="setSection('indice')" class="nav-btn px-4 py-2 brutalist-border border-l-0 hover:bg-black hover:text-white transition-colors">
+          03. Índice / Perfil
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-10">
+
+    <!-- ======================================================== -->
+    <!-- SECTION 1: EM EXIBIÇÃO / POSTER GALLERY -->
+    <!-- ======================================================== -->
+    <section id="section-acervo" class="space-y-12">
+      
+      <!-- Section Intro & Curatorial Note -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 pb-6 brutalist-border-b">
+        <div class="md:col-span-4">
+          <span class="text-[10px] font-mono uppercase tracking-widest text-[#666666]">[ SEÇÃO ATIVA ]</span>
+          <h2 class="text-xl font-bold uppercase tracking-tight mt-1">Obras Em Acompanhamento</h2>
+        </div>
+        <div class="md:col-span-8 text-xs font-mono text-[#555555] leading-relaxed flex items-end">
+          <p>
+            Obras audiovisuais seriadas organizadas pela cronologia do próximo episódio a ser apreciado. Selecione qualquer peça para acessar sua ficha catalográfica e registrar sua impressão crítica.
+          </p>
+        </div>
+      </div>
+
+      <!-- Poster Exhibition Grid -->
+      <div id="poster-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
+        <!-- Rendered dynamically below via JavaScript -->
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- SECTION 2: DIÁRIO / ÍNDICE CRONOLÓGICO -->
+    <!-- ======================================================== -->
+    <section id="section-registro" class="space-y-8 hidden">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 pb-6 brutalist-border-b">
+        <div class="md:col-span-4">
+          <span class="text-[10px] font-mono uppercase tracking-widest text-[#666666]">[ CADERNO DE REGISTROS ]</span>
+          <h2 class="text-xl font-bold uppercase tracking-tight mt-1">Diário de Visualização</h2>
+        </div>
+        <div class="md:col-span-8 text-xs font-mono text-[#555555] leading-relaxed flex items-end justify-between">
+          <p>Registro sequencial de episódios consumidos com anotações críticas e julgamento de valor.</p>
+          <span class="font-bold text-black" id="total-logs-count">TOTAL: 4 ENTRADAS</span>
+        </div>
+      </div>
+
+      <!-- Brutalist Monospace Table -->
+      <div class="overflow-x-auto brutalist-border">
+        <table class="w-full text-left text-xs font-mono">
+          <thead class="bg-[#fafafa] brutalist-border-b uppercase text-[11px]">
+            <tr>
+              <th class="py-3 px-4 w-28">Data</th>
+              <th class="py-3 px-4 w-40">Obra</th>
+              <th class="py-3 px-4 w-24">Código</th>
+              <th class="py-3 px-4">Título do Episódio</th>
+              <th class="py-3 px-4 w-24">Avaliação</th>
+              <th class="py-3 px-4">Nota Crítica</th>
+            </tr>
+          </thead>
+          <tbody id="diary-body" class="divide-y divide-black">
+            <!-- Dynamic entries -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- SECTION 3: ÍNDICE & PERFIL CATALOGRÁFICO -->
+    <!-- ======================================================== -->
+    <section id="section-indice" class="space-y-12 hidden">
+      
+      <!-- Cataloguer Data -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 brutalist-border-b">
+        <div class="md:col-span-4 space-y-4">
+          <div class="w-28 h-28 brutalist-border p-1 bg-[#fafafa]">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80" class="w-full h-full object-cover filter grayscale" />
+          </div>
+          <div>
+            <h2 class="text-lg font-bold uppercase tracking-tight">Rodrigo Pessotti</h2>
+            <p class="text-xs font-mono text-[#666666]">ARQUIVISTA N° 0842 • DESDE 2018</p>
+          </div>
+        </div>
+        
+        <div class="md:col-span-8 flex flex-col justify-between">
+          <p class="text-sm font-mono text-[#333333] leading-relaxed max-w-xl">
+            Acervo pessoal focado em narrativas seriadas contemporâneas de alto rigor dramático, com especial atenção a estrutura de roteiro, ritmo de montagem e cinematografia de autor.
+          </p>
+
+          <!-- Core Brutalist Numbers -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 brutalist-border-t mt-6">
+            <div>
+              <span class="text-[10px] font-mono text-[#666666] uppercase">Horas Totais</span>
+              <div class="text-2xl font-black font-mono mt-1">830H</div>
+            </div>
+            <div>
+              <span class="text-[10px] font-mono text-[#666666] uppercase">Episódios</span>
+              <div class="text-2xl font-black font-mono mt-1">1.428</div>
+            </div>
+            <div>
+              <span class="text-[10px] font-mono text-[#666666] uppercase">Obras Concluídas</span>
+              <div class="text-2xl font-black font-mono mt-1">42</div>
+            </div>
+            <div>
+              <span class="text-[10px] font-mono text-[#666666] uppercase">Média Geral</span>
+              <div class="text-2xl font-black font-mono mt-1">4.2 / 5</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Pinned Masterpieces (Quarteto Canônico) -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-mono uppercase tracking-widest text-[#666666]">
+            [ OBRAS CANÔNICAS SELECIONADAS // TOP 4 ]
+          </h3>
+          <span class="text-xs font-mono text-[#666666]">CURADORIA PERMANENTE</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          <div class="brutalist-border p-3 bg-[#fafafa]">
+            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover filter grayscale contrast-125" />
+            <div class="mt-3 pt-2 brutalist-border-t text-xs font-mono">
+              <strong class="block uppercase font-bold text-black">Severance</strong>
+              <span class="text-[10px] text-[#666666]">DAN ERICKSON • 2022–</span>
+            </div>
+          </div>
+
+          <div class="brutalist-border p-3 bg-[#fafafa]">
+            <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover filter grayscale contrast-125" />
+            <div class="mt-3 pt-2 brutalist-border-t text-xs font-mono">
+              <strong class="block uppercase font-bold text-black">Succession</strong>
+              <span class="text-[10px] text-[#666666]">JESSE ARMSTRONG • 2018–2023</span>
+            </div>
+          </div>
+
+          <div class="brutalist-border p-3 bg-[#fafafa]">
+            <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover filter grayscale contrast-125" />
+            <div class="mt-3 pt-2 brutalist-border-t text-xs font-mono">
+              <strong class="block uppercase font-bold text-black">Dark</strong>
+              <span class="text-[10px] text-[#666666]">BARAN BO ODAR • 2017–2020</span>
+            </div>
+          </div>
+
+          <div class="brutalist-border p-3 bg-[#fafafa]">
+            <img src="https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=500&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover filter grayscale contrast-125" />
+            <div class="mt-3 pt-2 brutalist-border-t text-xs font-mono">
+              <strong class="block uppercase font-bold text-black">Fleabag</strong>
+              <span class="text-[10px] text-[#666666]">PHOEBE WALLER-BRIDGE • 2016–2019</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: FICHA CATALOGRÁFICA DO EPISÓDIO (MUSEUM EXHIBIT SHEET) -->
+  <!-- ======================================================== -->
+  <div id="exhibit-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
+    <div class="bg-white brutalist-border w-full max-w-3xl my-auto shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
+      
+      <!-- Top Modal Bar -->
+      <div class="px-6 py-3 brutalist-border-b bg-[#fafafa] flex items-center justify-between text-xs font-mono">
+        <span id="modal-catalog-no">CATÁLOGO N° 0403 // REGISTRO OFICIAL</span>
+        <button onclick="closeModal()" class="hover:bg-black hover:text-white px-2 py-0.5 font-bold transition-colors">
+          [ FECHAR ✕ ]
+        </button>
+      </div>
+
+      <div class="p-6 sm:p-8 space-y-8">
+        
+        <!-- Poster Frame & Exhibition Details -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-6">
+          <div class="sm:col-span-5 brutalist-border p-2 bg-[#fafafa]">
+            <img id="modal-image" src="" class="w-full aspect-[3/4] object-cover filter grayscale contrast-110" />
+            <div class="mt-2 text-[9px] font-mono uppercase text-[#666666] text-center">
+              FOTOGRAMA ORIGINAL DE PRODUÇÃO
+            </div>
+          </div>
+
+          <div class="sm:col-span-7 flex flex-col justify-between space-y-4">
+            <div>
+              <span id="modal-show" class="text-xs font-mono font-bold uppercase tracking-widest text-[#666666]">SUCCESSION</span>
+              <h2 id="modal-title" class="text-2xl sm:text-3xl font-black uppercase tracking-tight mt-1">CONNOR'S WEDDING</h2>
+              <div class="text-xs font-mono space-y-1 mt-3 pt-3 brutalist-border-t">
+                <div>CÓDIGO: <strong id="modal-code">S04 • E03</strong></div>
+                <div>DURAÇÃO: <strong id="modal-runtime">61 MINUTOS</strong></div>
+                <div>EXIBIÇÃO: <strong id="modal-date">09 ABRIL 2023</strong></div>
+                <div>DIREÇÃO: <strong>MARK MYLOD</strong></div>
+              </div>
+            </div>
+
+            <!-- Primary Action: Accession Stamp -->
+            <div class="pt-4 brutalist-border-t space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono uppercase">ESTADO NO ACERVO:</span>
+                <span id="modal-stamp-status" class="stamp stamp-watched">ASSISTIDO</span>
+              </div>
+              <button id="modal-toggle-btn" onclick="toggleModalWatched()" class="w-full py-3 brutalist-border font-mono text-xs uppercase font-bold transition-all bg-black text-white hover:bg-[#222222]">
+                MARCAR COMO ASSISTIDO
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Curatorial Overview -->
+        <div class="space-y-2">
+          <h3 class="text-xs font-mono uppercase tracking-wider text-[#666666]">[ SINOPSE CATALOGRÁFICA ]</h3>
+          <p id="modal-overview" class="text-xs sm:text-sm font-mono text-[#222222] leading-relaxed bg-[#fafafa] p-4 brutalist-border">
+            —
+          </p>
+        </div>
+
+        <!-- Critical Rating (1 to 5 points) -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="uppercase font-bold text-black">JULGAMENTO CRÍTICO (1 A 5)</span>
+            <span id="modal-stars-text" class="text-[#666666]">★★★★★ (5/5)</span>
+          </div>
+          <div class="grid grid-cols-5 gap-2 text-center text-xs font-mono">
+            <button onclick="setModalRating(1)" class="p-2 brutalist-border hover:bg-black hover:text-white transition-colors">1.0</button>
+            <button onclick="setModalRating(2)" class="p-2 brutalist-border hover:bg-black hover:text-white transition-colors">2.0</button>
+            <button onclick="setModalRating(3)" class="p-2 brutalist-border hover:bg-black hover:text-white transition-colors">3.0</button>
+            <button onclick="setModalRating(4)" class="p-2 brutalist-border hover:bg-black hover:text-white transition-colors">4.0</button>
+            <button onclick="setModalRating(5)" class="p-2 brutalist-border bg-black text-white transition-colors">5.0</button>
+          </div>
+        </div>
+
+        <!-- Curatorial Journal Entry Note -->
+        <div class="space-y-2">
+          <label class="block text-xs font-mono uppercase text-[#666666]">[ ANOTAÇÃO DO ESPECTADOR ]</label>
+          <textarea id="modal-note-input" placeholder="Escreva uma reflexão sucinta sobre a obra..." class="w-full p-3 brutalist-border font-mono text-xs text-black placeholder-[#888888] focus:outline-none h-20 resize-none"></textarea>
+          <div class="flex justify-end">
+            <button onclick="saveModalNote()" class="px-4 py-2 brutalist-border font-mono text-xs uppercase font-bold hover:bg-black hover:text-white transition-colors">
+              SALVAR NO DIÁRIO
+            </button>
+          </div>
+        </div>
+
+        <!-- Editorial Discussion / Minimalist Reader -->
+        <div class="pt-6 brutalist-border-t space-y-4">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="font-bold uppercase">[ ANÁLISES DA COMUNIDADE ]</span>
+            <span class="text-[#666666]">TEXTO INTEGRAL</span>
+          </div>
+
+          <!-- The Brutalist Spoiler Shield -->
+          <div id="spoiler-box" class="p-6 brutalist-border bg-[#fafafa] space-y-3 text-xs font-mono">
+            <div class="font-bold uppercase tracking-wider text-black">
+              AVISO: TEXTO COM ANÁLISE INTEGRAL DO ENREDO (SPOILER)
+            </div>
+            <p class="text-[#666666]">
+              A discussão crítica abaixo contém detalhes do desenrolar dramático. Só é exibida caso a obra tenha sido registrada como consumida.
+            </p>
+            <button id="spoiler-unlock-btn" onclick="forceUnlock()" class="underline hover:text-black">
+              [ EXIBIR ANÁLISE MESMO ASSIM ]
+            </button>
+          </div>
+
+          <!-- Unlocked Discussion -->
+          <div id="unlocked-discussion" class="space-y-4 hidden font-mono text-xs">
+            <div class="p-4 brutalist-border space-y-2">
+              <div class="flex items-center justify-between text-[11px] text-[#666666]">
+                <span>REGISTRO CRÍTICO #01 • L. MENDES</span>
+                <span>NOTA: 5.0 / 5.0</span>
+              </div>
+              <p class="leading-relaxed text-[#111111]">
+                "A decisão de filmar 28 minutos ininterruptos com os irmãos recebendo a notícia sem nunca mostrar o corpo de Logan confere à obra a gravidade de uma tragédia grega em tempo real."
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BRUTALIST JAVASCRIPT LOGIC -->
+  <script>
+    const archiveData = [
+      {
+        id: 'severance',
+        title: 'Severance',
+        network: 'APPLE STUDIOS',
+        year: '2022–',
+        poster: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop&q=80',
+        catNo: 'CAT. 0204',
+        episode: {
+          id: 'severance-2-4',
+          code: 'S02 • E04',
+          title: 'Woe\'s Hollow',
+          runtime: 54,
+          date: '12 MAIO 2024',
+          overview: 'Mark e sua equipe exploram uma subdivisão clandestina do complexo Lumon sob vigilância implacável de Milchick.',
+          watched: false,
+          rating: 4.5,
+          userNote: ''
+        }
+      },
+      {
+        id: 'succession',
+        title: 'Succession',
+        network: 'HBO ENTERTAINMENT',
+        year: '2018–2023',
+        poster: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80',
+        catNo: 'CAT. 0403',
+        episode: {
+          id: 'succession-4-3',
+          code: 'S04 • E03',
+          title: 'Connor\'s Wedding',
+          runtime: 61,
+          date: '09 ABRIL 2023',
+          overview: 'Uma reunião familiar à beira de um casamento em Nova York é interrompida por acontecimentos irreversíveis a bordo de um voo internacional.',
+          watched: true,
+          rating: 5.0,
+          userNote: 'Uma aula magistral de direção teatral contemporânea.'
+        }
+      },
+      {
+        id: 'the-bear',
+        title: 'The Bear',
+        network: 'FX PRODUCTIONS',
+        year: '2022–',
+        poster: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=80',
+        catNo: 'CAT. 0301',
+        episode: {
+          id: 'the-bear-3-1',
+          code: 'S03 • E01',
+          title: 'Tomorrow',
+          runtime: 38,
+          date: '26 JUNHO 2024',
+          overview: 'Um poema visual sem diálogos expositivos revendo as cicatrizes culinárias que forjaram a obsessão de Carmy.',
+          watched: false,
+          rating: 4.0,
+          userNote: ''
+        }
+      },
+      {
+        id: 'hotd',
+        title: 'House of the Dragon',
+        network: 'HBO ENTERTAINMENT',
+        year: '2022–',
+        poster: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=500&auto=format&fit=crop&q=80',
+        catNo: 'CAT. 0204',
+        episode: {
+          id: 'hotd-2-4',
+          code: 'S02 • E04',
+          title: 'The Red Dragon and the Gold',
+          runtime: 59,
+          date: '07 JULHO 2024',
+          overview: 'O confronto aéreo sobre Pouso das Gralhas culmina na primeira batalha declarada da Dança dos Dragões.',
+          watched: true,
+          rating: 5.0,
+          userNote: 'A melhor coreografia de combate mítico já vista em televisão.'
+        }
+      }
+    ];
+
+    let currentModalItem = null;
+
+    // Navigation Switcher
+    function setSection(secId) {
+      ['acervo', 'registro', 'indice'].forEach(s => {
+        const el = document.getElementById(`section-${s}`);
+        const btn = document.getElementById(`nav-${s}`);
+        if (el) el.classList.toggle('hidden', s !== secId);
+        if (btn) {
+          if (s === secId) {
+            btn.classList.add('bg-black', 'text-white');
+          } else {
+            btn.classList.remove('bg-black', 'text-white');
+          }
+        }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Render Posters
+    function renderPosterGrid() {
+      const grid = document.getElementById('poster-grid');
+      grid.innerHTML = '';
+
+      archiveData.forEach(item => {
+        const ep = item.episode;
+        const card = document.createElement('div');
+        card.className = 'poster-card group brutalist-border p-4 bg-white flex flex-col justify-between space-y-4';
+
+        card.innerHTML = `
+          <div class="space-y-3 cursor-pointer" onclick="openExhibitModal('${item.id}')">
+            <!-- Header Stamp Info -->
+            <div class="flex items-center justify-between text-[11px] font-mono">
+              <span class="text-[#666666] font-bold">${item.catNo}</span>
+              <span class="${ep.watched ? 'stamp stamp-watched' : 'stamp'}">
+                ${ep.watched ? 'ASSISTIDO ✓' : 'NÃO VISTO'}
+              </span>
+            </div>
+
+            <!-- Poster Image (Museum Matting Frame) -->
+            <div class="brutalist-border p-2 bg-[#f8f8f8] overflow-hidden">
+              <img src="${item.poster}" alt="${item.title}" class="poster-art w-full aspect-[3/4] object-cover" />
+            </div>
+
+            <!-- Exhibition Placard (Museum Label) -->
+            <div class="pt-2">
+              <div class="text-[10px] font-mono text-[#666666] uppercase">${item.network} // ${item.year}</div>
+              <h3 class="text-xl font-bold uppercase tracking-tight text-black mt-0.5">${item.title}</h3>
+              <p class="text-xs font-mono text-[#333333] mt-1">${ep.code} — "${ep.title}"</p>
+              <p class="text-[11px] font-mono text-[#666666] mt-0.5">${ep.runtime} MIN • EXIBIÇÃO: ${ep.date}</p>
+            </div>
+          </div>
+
+          <!-- Bottom Action -->
+          <div class="pt-3 brutalist-border-t flex items-center justify-between text-xs font-mono">
+            <button onclick="openExhibitModal('${item.id}')" class="underline hover:text-[#666666]">
+              [ FICHA TÉCNICA ]
+            </button>
+            <button onclick="toggleItemWatched('${item.id}', event)" class="px-3 py-1 brutalist-border font-bold uppercase ${ep.watched ? 'bg-black text-white hover:bg-white hover:text-black' : 'hover:bg-black hover:text-white'} transition-colors">
+              ${ep.watched ? 'CONCLUÍDO' : 'MARCAR VISTO'}
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // Render Diary Table
+    function renderDiary() {
+      const tbody = document.getElementById('diary-body');
+      tbody.innerHTML = '';
+      const watchedItems = archiveData.filter(i => i.episode.watched);
+
+      watchedItems.forEach(item => {
+        const ep = item.episode;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#fafafa]';
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-[#666666] whitespace-nowrap">SET 2026</td>
+          <td class="py-3 px-4 font-bold uppercase">${item.title}</td>
+          <td class="py-3 px-4">${ep.code}</td>
+          <td class="py-3 px-4">"${ep.title}"</td>
+          <td class="py-3 px-4 font-bold">${ep.rating}.0 / 5</td>
+          <td class="py-3 px-4 text-[#555555] max-w-xs truncate">${ep.userNote || '—'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('total-logs-count').innerText = `TOTAL: ${watchedItems.length} ENTRADAS`;
+    }
+
+    function toggleItemWatched(id, event) {
+      if (event) event.stopPropagation();
+      const item = archiveData.find(i => i.id === id);
+      if (!item) return;
+      item.episode.watched = !item.episode.watched;
+      renderPosterGrid();
+      renderDiary();
+    }
+
+    // Modal Details
+    function openExhibitModal(id) {
+      const item = archiveData.find(i => i.id === id);
+      if (!item) return;
+      currentModalItem = item;
+      const ep = item.episode;
+
+      document.getElementById('modal-catalog-no').innerText = `${item.catNo} // REGISTRO OFICIAL`;
+      document.getElementById('modal-image').src = item.poster;
+      document.getElementById('modal-show').innerText = item.title;
+      document.getElementById('modal-title').innerText = ep.title;
+      document.getElementById('modal-code').innerText = ep.code;
+      document.getElementById('modal-runtime').innerText = `${ep.runtime} MINUTOS`;
+      document.getElementById('modal-date').innerText = ep.date;
+      document.getElementById('modal-overview').innerText = ep.overview;
+      document.getElementById('modal-note-input').value = ep.userNote || '';
+
+      updateModalWatchedUI(ep.watched);
+
+      document.getElementById('exhibit-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('exhibit-modal').classList.add('hidden');
+    }
+
+    function updateModalWatchedUI(isWatched) {
+      const stamp = document.getElementById('modal-stamp-status');
+      const btn = document.getElementById('modal-toggle-btn');
+      const spoilerBox = document.getElementById('spoiler-box');
+      const unlocked = document.getElementById('unlocked-discussion');
+
+      if (isWatched) {
+        stamp.className = 'stamp stamp-watched';
+        stamp.innerText = 'ASSISTIDO';
+        btn.innerText = 'DESMARCAR DO ACERVO';
+        btn.className = 'w-full py-3 brutalist-border font-mono text-xs uppercase font-bold transition-all bg-white text-black hover:bg-black hover:text-white';
+        spoilerBox.classList.add('hidden');
+        unlocked.classList.remove('hidden');
+      } else {
+        stamp.className = 'stamp';
+        stamp.innerText = 'NÃO VISTO';
+        btn.innerText = 'MARCAR COMO ASSISTIDO';
+        btn.className = 'w-full py-3 brutalist-border font-mono text-xs uppercase font-bold transition-all bg-black text-white hover:bg-[#222222]';
+        spoilerBox.classList.remove('hidden');
+        unlocked.classList.add('hidden');
+      }
+    }
+
+    function toggleModalWatched() {
+      if (!currentModalItem) return;
+      currentModalItem.episode.watched = !currentModalItem.episode.watched;
+      updateModalWatchedUI(currentModalItem.episode.watched);
+      renderPosterGrid();
+      renderDiary();
+    }
+
+    function forceUnlock() {
+      document.getElementById('spoiler-box').classList.add('hidden');
+      document.getElementById('unlocked-discussion').classList.remove('hidden');
+    }
+
+    function setModalRating(val) {
+      if (!currentModalItem) return;
+      currentModalItem.episode.rating = val;
+      document.getElementById('modal-stars-text').innerText = `★`.repeat(val) + ` (${val}/5)`;
+    }
+
+    function saveModalNote() {
+      if (!currentModalItem) return;
+      const note = document.getElementById('modal-note-input').value.trim();
+      currentModalItem.episode.userNote = note;
+      renderDiary();
+      alert('Anotação registrada com sucesso no Diário.');
+    }
+
+    // Init
+    renderPosterGrid();
+    renderDiary();
+  </script>
+</body>
+</html>

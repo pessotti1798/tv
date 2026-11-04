@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EPISODIC — TV Tracking & Journal</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #14181c;
+      --bg-surface: #1b2228;
+      --bg-surface-hover: #222b34;
+      --bg-card: #1f272f;
+      --border-subtle: #2c3642;
+      --text-main: #e1e7ed;
+      --text-muted: #8b9baa;
+      --accent-green: #00e054;
+      --accent-amber: #ffaa00;
+      --accent-blue: #40bcf4;
+      --danger: #ff4545;
+    }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .poster-glow:hover {
+      box-shadow: 0 8px 24px -6px rgba(0, 224, 84, 0.25);
+    }
+    .star-rating svg {
+      transition: transform 0.15s ease, fill 0.15s ease;
+    }
+    .star-rating svg:hover {
+      transform: scale(1.15);
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #14181c;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2c3642;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #404f5e;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-[#00e054] selection:text-black">
+
+  <!-- TOP NAVIGATION (Letterboxd Style Clean Header) -->
+  <header class="sticky top-0 z-40 bg-[#14181c]/95 backdrop-blur border-b border-[#242d36] px-4 lg:px-8 py-3 transition-all">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-6">
+        <a href="#" onclick="switchTab('upnext')" class="flex items-center gap-2.5 group">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00e054] to-[#00a83e] flex items-center justify-center text-black font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
+            <svg class="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="2" y="5" width="20" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M10 9l5 3-5 3V9z"/>
+              <path d="M8 2l4 3 4-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <span class="font-extrabold tracking-wider text-white text-lg group-hover:text-[#00e054] transition-colors">EPISODIC</span>
+            <span class="hidden sm:inline-block text-[10px] uppercase tracking-widest text-[#8b9baa] ml-2 px-1.5 py-0.5 rounded bg-[#1f272f] border border-[#2c3642]">beta</span>
+          </div>
+        </a>
+
+        <!-- Main Navigation Links -->
+        <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
+          <button id="nav-upnext" onclick="switchTab('upnext')" class="tab-btn px-3.5 py-1.5 rounded-md text-white bg-[#242f38] transition-all flex items-center gap-2">
+            <svg class="w-4 h-4 text-[#00e054]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            A Seguir
+          </button>
+          <button id="nav-calendar" onclick="switchTab('calendar')" class="tab-btn px-3.5 py-1.5 rounded-md text-[#8b9baa] hover:text-white hover:bg-[#1b2228] transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Calendário
+          </button>
+          <button id="nav-diary" onclick="switchTab('diary')" class="tab-btn px-3.5 py-1.5 rounded-md text-[#8b9baa] hover:text-white hover:bg-[#1b2228] transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Diário (Diary)
+          </button>
+          <button id="nav-lists" onclick="switchTab('lists')" class="tab-btn px-3.5 py-1.5 rounded-md text-[#8b9baa] hover:text-white hover:bg-[#1b2228] transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+            Listas
+          </button>
+          <button id="nav-profile" onclick="switchTab('profile')" class="tab-btn px-3.5 py-1.5 rounded-md text-[#8b9baa] hover:text-white hover:bg-[#1b2228] transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            Perfil
+          </button>
+        </nav>
+      </div>
+
+      <!-- Quick Search & User Profile Capsule -->
+      <div class="flex items-center gap-3">
+        <div class="relative hidden sm:block w-48 lg:w-64">
+          <input type="text" placeholder="Buscar série, episódio..." class="w-full bg-[#1b2228] border border-[#2c3642] focus:border-[#00e054] rounded-full py-1.5 pl-8 pr-3 text-xs text-white placeholder-[#687684] focus:outline-none transition-colors" />
+          <svg class="w-3.5 h-3.5 text-[#687684] absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+
+        <!-- TV Time Watch Time Pill -->
+        <div class="hidden xl:flex items-center gap-2 bg-[#1b2228] border border-[#2c3642] px-3 py-1 rounded-full text-xs text-[#8b9baa]" title="Tempo total acumulado de séries">
+          <span class="w-2 h-2 rounded-full bg-[#00e054] animate-pulse"></span>
+          <span>Tempo assistido: <strong class="text-white" id="header-watchtime">34d 14h</strong></span>
+        </div>
+
+        <!-- Switch to Museum Brutalist View -->
+        <a href="museum.html" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black text-xs font-mono font-bold hover:bg-[#e1e7ed] transition-colors shadow-sm">
+          <span>🏛️ Acervo / Museu</span>
+        </a>
+
+        <!-- User Avatar -->
+        <button onclick="switchTab('profile')" class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-[#1b2228] border border-transparent hover:border-[#2c3642] transition-colors">
+          <span class="text-xs font-semibold text-white hidden md:inline">Rodrigo</span>
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="w-7 h-7 rounded-full object-cover ring-1 ring-[#00e054]" />
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Mobile Nav Bar (Bottom pinned or inline) -->
+    <div class="flex md:hidden items-center justify-around pt-2 mt-2 border-t border-[#242d36] text-xs">
+      <button onclick="switchTab('upnext')" class="py-1 px-2 text-[#00e054] font-medium flex flex-col items-center">
+        <span>A Seguir</span>
+      </button>
+      <button onclick="switchTab('calendar')" class="py-1 px-2 text-[#8b9baa] flex flex-col items-center">
+        <span>Calendário</span>
+      </button>
+      <button onclick="switchTab('diary')" class="py-1 px-2 text-[#8b9baa] flex flex-col items-center">
+        <span>Diário</span>
+      </button>
+      <button onclick="switchTab('profile')" class="py-1 px-2 text-[#8b9baa] flex flex-col items-center">
+        <span>Perfil</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8">
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: UP NEXT / A SEGUIR (The Classic TV Time Core Engine) -->
+    <!-- ======================================================== -->
+    <section id="view-upnext" class="space-y-8 animate-fadeIn">
+      
+      <!-- Top Status Banner -->
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-[#242d36]">
+        <div>
+          <div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-[#00e054] uppercase">
+            <span>● Radar de Transmissão</span>
+          </div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-white mt-1">Próximos a Assistir</h1>
+          <p class="text-sm text-[#8b9baa]">Sua fila personalizada de episódios prontos para serem vistos.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[#8b9baa]">Ordenar por:</span>
+          <select class="bg-[#1b2228] border border-[#2c3642] text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none">
+            <option>Lançamento mais recente</option>
+            <option>Ordem alfabética</option>
+            <option>Mais perto de terminar</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Up Next Grid -->
+      <div id="upnext-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Cards generated dynamically via JavaScript below -->
+      </div>
+
+      <!-- Recently Completed / Em Pausa Section -->
+      <div class="pt-8">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center justify-between">
+          <span>Temporadas Finalizadas Recentemente</span>
+          <span class="text-xs text-[#8b9baa] font-normal">Ver histórico completo →</span>
+        </h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div class="group relative rounded-lg overflow-hidden bg-[#1b2228] border border-[#2c3642]">
+            <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=300&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Dark" />
+            <div class="p-2.5">
+              <h3 class="text-xs font-bold text-white truncate">Dark</h3>
+              <p class="text-[11px] text-[#00e054]">T3 completa ★★★★★</p>
+            </div>
+          </div>
+          <div class="group relative rounded-lg overflow-hidden bg-[#1b2228] border border-[#2c3642]">
+            <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=300&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Better Call Saul" />
+            <div class="p-2.5">
+              <h3 class="text-xs font-bold text-white truncate">Better Call Saul</h3>
+              <p class="text-[11px] text-[#00e054]">T6 completa ★★★★★</p>
+            </div>
+          </div>
+          <div class="group relative rounded-lg overflow-hidden bg-[#1b2228] border border-[#2c3642]">
+            <img src="https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=300&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Fleabag" />
+            <div class="p-2.5">
+              <h3 class="text-xs font-bold text-white truncate">Fleabag</h3>
+              <p class="text-[11px] text-[#00e054]">T2 completa ★★★★★</p>
+            </div>
+          </div>
+          <div class="group relative rounded-lg overflow-hidden bg-[#1b2228] border border-[#2c3642]">
+            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Chernobyl" />
+            <div class="p-2.5">
+              <h3 class="text-xs font-bold text-white truncate">Chernobyl</h3>
+              <p class="text-[11px] text-[#00e054]">Minissérie ★★★★★</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: CALENDÁRIO / SCHEDULE (TV Time Release Timeline) -->
+    <!-- ======================================================== -->
+    <section id="view-calendar" class="space-y-6 hidden animate-fadeIn">
+      <div class="pb-4 border-b border-[#242d36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-white">Calendário de Estreias</h1>
+          <p class="text-sm text-[#8b9baa]">Lançamentos das séries que você acompanha nas próximas semanas.</p>
+        </div>
+        <div class="flex items-center gap-2 bg-[#1b2228] p-1 rounded-lg border border-[#2c3642] text-xs">
+          <button class="px-3 py-1 rounded bg-[#242f38] text-white font-medium">Esta Semana</button>
+          <button class="px-3 py-1 rounded text-[#8b9baa] hover:text-white">Mês</button>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Day 1: Hoje -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="px-2.5 py-1 rounded bg-[#00e054]/10 text-[#00e054] text-xs font-bold uppercase tracking-wider">Hoje • Quarta-feira</span>
+            <span class="text-xs text-[#8b9baa]">16 de Setembro</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-[#1b2228] border border-[#2c3642] hover:border-[#40bcf4] p-4 rounded-xl flex gap-4 transition-all">
+              <div class="w-16 h-24 rounded-lg bg-[#2c3642] shrink-0 overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-cover" />
+              </div>
+              <div class="flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-[#40bcf4] font-semibold">Apple TV+</span>
+                    <span class="text-[#8b9baa]">22:00 BRT</span>
+                  </div>
+                  <h3 class="text-base font-bold text-white mt-0.5">Slow Horses</h3>
+                  <p class="text-xs text-[#8b9baa]">S04E03 • "Penny Pinching"</p>
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                  <span class="text-[11px] text-[#ffaa00] font-medium">Disponível em 4 horas</span>
+                  <button onclick="openEpisodeModal('slow-horses-4-3')" class="text-xs bg-[#242f38] hover:bg-[#2c3642] text-white px-3 py-1 rounded-md transition-colors">Detalhes</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-[#1b2228] border border-[#2c3642] p-4 rounded-xl flex gap-4 opacity-75">
+              <div class="w-16 h-24 rounded-lg bg-[#2c3642] shrink-0 overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-cover" />
+              </div>
+              <div class="flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-purple-400 font-semibold">Disney+ / Hulu</span>
+                    <span class="text-[#8b9baa]">Já disponível</span>
+                  </div>
+                  <h3 class="text-base font-bold text-white mt-0.5">Only Murders in the Building</h3>
+                  <p class="text-xs text-[#8b9baa]">S04E04 • "The Stunt Man"</p>
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                  <span class="text-[11px] text-[#00e054]">Transmitido hoje</span>
+                  <button onclick="openEpisodeModal('omitb-4-4')" class="text-xs bg-[#00e054] text-black font-semibold px-3 py-1 rounded-md hover:bg-[#00c749] transition-colors">Ver Agora</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day 2: Domingo -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="px-2.5 py-1 rounded bg-[#1f272f] text-[#8b9baa] text-xs font-bold uppercase tracking-wider">Domingo</span>
+            <span class="text-xs text-[#8b9baa]">20 de Setembro</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-[#1b2228] border border-[#2c3642] p-4 rounded-xl flex gap-4">
+              <div class="w-16 h-24 rounded-lg bg-[#2c3642] shrink-0 overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1514565131-fce0801e5785?w=200&auto=format&fit=crop&q=80" class="w-full h-full object-cover" />
+              </div>
+              <div class="flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-red-400 font-semibold">HBO Max</span>
+                    <span class="text-[#8b9baa]">23:00 BRT</span>
+                  </div>
+                  <h3 class="text-base font-bold text-white mt-0.5">The Penguin</h3>
+                  <p class="text-xs text-[#8b9baa]">S01E01 • "After Hours" (Series Premiere)</p>
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                  <span class="text-[11px] text-[#8b9baa]">Em 4 dias</span>
+                  <button class="text-xs bg-[#242f38] hover:bg-[#2c3642] text-white px-3 py-1 rounded-md transition-colors">Definir Lembrete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: DIÁRIO / DIARY (Letterboxd-Style Granular Log) -->
+    <!-- ======================================================== -->
+    <section id="view-diary" class="space-y-6 hidden animate-fadeIn">
+      <div class="pb-4 border-b border-[#242d36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-[#00e054] uppercase">
+            <span>● Registro Cronológico</span>
+          </div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-white mt-1">Diário de Episódios</h1>
+          <p class="text-sm text-[#8b9baa]">Cada episódio assistido, com sua respectiva data, avaliação e resenha.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-xs text-[#8b9baa]">
+            Filtrar: <button class="text-white hover:underline ml-1">2026</button> • <button class="text-[#8b9baa] hover:text-white">Com resenha</button>
+          </div>
+          <button onclick="openQuickLogModal()" class="px-3.5 py-1.5 rounded-lg bg-[#00e054] hover:bg-[#00c749] text-black font-semibold text-xs transition-colors flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Adicionar Registro
+          </button>
+        </div>
+      </div>
+
+      <!-- Diary Table -->
+      <div class="bg-[#1b2228] border border-[#2c3642] rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-[#14181c] border-b border-[#2c3642] text-[#8b9baa] uppercase tracking-wider font-semibold">
+              <tr>
+                <th class="py-3 px-4 w-28">Data</th>
+                <th class="py-3 px-4 w-16">Pôster</th>
+                <th class="py-3 px-4">Série & Episódio</th>
+                <th class="py-3 px-4 w-32">Avaliação</th>
+                <th class="py-3 px-4">Resenha / Reação</th>
+                <th class="py-3 px-4 w-16 text-center">Rewatch</th>
+              </tr>
+            </thead>
+            <tbody id="diary-table-body" class="divide-y divide-[#242d36] text-[#e1e7ed]">
+              <!-- Dynamic entries rendered below -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: LISTAS (Letterboxd Style Curated Collections) -->
+    <!-- ======================================================== -->
+    <section id="view-lists" class="space-y-6 hidden animate-fadeIn">
+      <div class="pb-4 border-b border-[#242d36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-white">Listas Comunitárias</h1>
+          <p class="text-sm text-[#8b9baa]">Curadorias temáticas de temporadas, episódios marcantes e universos de TV.</p>
+        </div>
+        <button class="px-3.5 py-1.5 rounded-lg bg-[#242f38] hover:bg-[#2c3642] text-white font-medium text-xs transition-colors">
+          + Criar Nova Lista
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- List Card 1 -->
+        <div class="bg-[#1b2228] border border-[#2c3642] hover:border-[#40bcf4] rounded-xl p-4 transition-all group cursor-pointer">
+          <div class="flex -space-x-8 overflow-hidden py-2 mb-3">
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80" alt="Show" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=200&auto=format&fit=crop&q=80" alt="Show" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=200&auto=format&fit=crop&q=80" alt="Show" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=200&auto=format&fit=crop&q=80" alt="Show" />
+          </div>
+          <h3 class="text-sm font-bold text-white group-hover:text-[#00e054] transition-colors">Os 25 Melhores Episódios de TV do Século XXI</h3>
+          <p class="text-xs text-[#8b9baa] mt-1 line-clamp-2">Uma compilação de episódios individuais que transcenderam a própria narrativa da série (ex: Ozymandias, Connor's Wedding, The Suitcase).</p>
+          <div class="mt-4 flex items-center justify-between text-[11px] text-[#687684]">
+            <span>Por <strong>CinematecaTV</strong></span>
+            <span>25 episódios • 1.4k curtidas</span>
+          </div>
+        </div>
+
+        <!-- List Card 2 -->
+        <div class="bg-[#1b2228] border border-[#2c3642] hover:border-[#40bcf4] rounded-xl p-4 transition-all group cursor-pointer">
+          <div class="flex -space-x-8 overflow-hidden py-2 mb-3">
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200&auto=format&fit=crop&q=80" alt="Chernobyl" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=200&auto=format&fit=crop&q=80" alt="Show" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1514565131-fce0801e5785?w=200&auto=format&fit=crop&q=80" alt="Show" />
+          </div>
+          <h3 class="text-sm font-bold text-white group-hover:text-[#00e054] transition-colors">Minisséries Perfeitas de Um Final de Semana</h3>
+          <p class="text-xs text-[#8b9baa] mt-1 line-clamp-2">Séries fechadas com menos de 8 episódios que você pode começar no sábado e chorar no domingo à noite.</p>
+          <div class="mt-4 flex items-center justify-between text-[11px] text-[#687684]">
+            <span>Por <strong>Rodrigo</strong></span>
+            <span>12 séries • 490 curtidas</span>
+          </div>
+        </div>
+
+        <!-- List Card 3 -->
+        <div class="bg-[#1b2228] border border-[#2c3642] hover:border-[#40bcf4] rounded-xl p-4 transition-all group cursor-pointer">
+          <div class="flex -space-x-8 overflow-hidden py-2 mb-3">
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=200&auto=format&fit=crop&q=80" alt="Dark" />
+            <img class="inline-block h-28 w-20 object-cover rounded-md ring-2 ring-[#1b2228]" src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80" alt="Severance" />
+          </div>
+          <h3 class="text-sm font-bold text-white group-hover:text-[#00e054] transition-colors">Sci-Fi Cerebral: Quebra-Cabeças que Não Te Subestimam</h3>
+          <p class="text-xs text-[#8b9baa] mt-1 line-clamp-2">Para quem ama teorizar em fóruns e criar árvores genealógicas para entender o enredo.</p>
+          <div class="mt-4 flex items-center justify-between text-[11px] text-[#687684]">
+            <span>Por <strong>Ana Paula</strong></span>
+            <span>8 séries • 820 curtidas</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 5: PERFIL (Letterboxd Favorites + TV Time Lifetime Stats) -->
+    <!-- ======================================================== -->
+    <section id="view-profile" class="space-y-8 hidden animate-fadeIn">
+      
+      <!-- Profile Header -->
+      <div class="bg-[#1b2228] border border-[#2c3642] rounded-2xl p-6 lg:p-8">
+        <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80" class="w-24 h-24 rounded-full object-cover ring-4 ring-[#00e054]/30" />
+          <div class="flex-1 text-center sm:text-left space-y-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h1 class="text-2xl font-bold text-white">Rodrigo Pessotti</h1>
+                <p class="text-xs text-[#8b9baa]">@rpessotti • Membro desde 2018</p>
+              </div>
+              <div class="flex items-center justify-center gap-2">
+                <button class="px-4 py-1.5 rounded-full bg-[#242f38] hover:bg-[#2c3642] text-xs font-semibold text-white transition-colors border border-[#2c3642]">Editar Perfil</button>
+                <button class="p-1.5 rounded-full bg-[#242f38] hover:bg-[#2c3642] text-[#8b9baa] hover:text-white transition-colors border border-[#2c3642]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-[#e1e7ed] max-w-xl">
+              Cinéfilo migrando as obsessões para temporadas de 10 horas. Fanático por roteiros de Jesse Armstrong e mundos de ficção distópica.
+            </p>
+          </div>
+        </div>
+
+        <!-- TV Time Classic Lifetime Stats Banner -->
+        <div class="mt-8 pt-6 border-t border-[#242d36] grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div class="p-3 rounded-xl bg-[#14181c] border border-[#242d36]">
+            <span class="text-[11px] text-[#8b9baa] uppercase tracking-wider font-semibold">Tempo Total Gasto</span>
+            <div class="text-lg lg:text-xl font-extrabold text-[#00e054] mt-1" id="profile-lifetime-time">34d 14h 22m</div>
+            <span class="text-[10px] text-[#687684]">830 horas da sua vida</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#14181c] border border-[#242d36]">
+            <span class="text-[11px] text-[#8b9baa] uppercase tracking-wider font-semibold">Episódios Vistos</span>
+            <div class="text-lg lg:text-xl font-extrabold text-white mt-1" id="profile-total-eps">1.428</div>
+            <span class="text-[10px] text-[#687684]">+12 esta semana</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#14181c] border border-[#242d36]">
+            <span class="text-[11px] text-[#8b9baa] uppercase tracking-wider font-semibold">Séries Finalizadas</span>
+            <div class="text-lg lg:text-xl font-extrabold text-[#ffaa00] mt-1">42</div>
+            <span class="text-[10px] text-[#687684]">100% de conclusão</span>
+          </div>
+          <div class="p-3 rounded-xl bg-[#14181c] border border-[#242d36]">
+            <span class="text-[11px] text-[#8b9baa] uppercase tracking-wider font-semibold">Resenhas Escritas</span>
+            <div class="text-lg lg:text-xl font-extrabold text-[#40bcf4] mt-1" id="profile-reviews-count">87</div>
+            <span class="text-[10px] text-[#687684]">No Diário</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Letterboxd Signature: "4 Favorite TV Shows" -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm uppercase tracking-wider font-bold text-[#8b9baa] flex items-center gap-2">
+            <span>★ 4 Séries Favoritas</span>
+          </h2>
+          <button class="text-xs text-[#00e054] hover:underline">Alterar favoritas</button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <!-- Fav 1 -->
+          <div class="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] poster-glow transition-all">
+            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=400&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+              <span class="text-xs font-bold text-white">Severance</span>
+              <span class="text-[11px] text-[#00e054]">★★★★★ (5.0)</span>
+            </div>
+          </div>
+          <!-- Fav 2 -->
+          <div class="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] poster-glow transition-all">
+            <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+              <span class="text-xs font-bold text-white">Succession</span>
+              <span class="text-[11px] text-[#00e054]">★★★★★ (5.0)</span>
+            </div>
+          </div>
+          <!-- Fav 3 -->
+          <div class="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] poster-glow transition-all">
+            <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+              <span class="text-xs font-bold text-white">Dark</span>
+              <span class="text-[11px] text-[#00e054]">★★★★★ (5.0)</span>
+            </div>
+          </div>
+          <!-- Fav 4 -->
+          <div class="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] poster-glow transition-all">
+            <img src="https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&auto=format&fit=crop&q=80" class="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+              <span class="text-xs font-bold text-white">Fleabag</span>
+              <span class="text-[11px] text-[#00e054]">★★★★★ (5.0)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rating Distribution Histogram (Letterboxd Style) -->
+      <div class="bg-[#1b2228] border border-[#2c3642] rounded-2xl p-6">
+        <h2 class="text-sm font-bold text-white mb-1">Distribuição de Avaliações (Episódios & Séries)</h2>
+        <p class="text-xs text-[#8b9baa] mb-6">Média geral: <strong class="text-white">4.1 ★</strong></p>
+
+        <!-- Bar chart simulation -->
+        <div class="h-32 flex items-end justify-between gap-1 sm:gap-2 px-2 border-b border-[#2c3642] pb-2">
+          <!-- 1/2 star -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[4%]"></div>
+            <span class="text-[9px] text-[#687684]">0.5</span>
+          </div>
+          <!-- 1 star -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[6%]"></div>
+            <span class="text-[9px] text-[#687684]">1.0</span>
+          </div>
+          <!-- 1.5 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[10%]"></div>
+            <span class="text-[9px] text-[#687684]">1.5</span>
+          </div>
+          <!-- 2.0 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[14%]"></div>
+            <span class="text-[9px] text-[#687684]">2.0</span>
+          </div>
+          <!-- 2.5 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[25%]"></div>
+            <span class="text-[9px] text-[#687684]">2.5</span>
+          </div>
+          <!-- 3.0 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[45%]"></div>
+            <span class="text-[9px] text-[#687684]">3.0</span>
+          </div>
+          <!-- 3.5 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#242f38] group-hover:bg-[#00e054] rounded-t transition-all h-[65%]"></div>
+            <span class="text-[9px] text-[#687684]">3.5</span>
+          </div>
+          <!-- 4.0 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#00e054]/70 group-hover:bg-[#00e054] rounded-t transition-all h-[92%]"></div>
+            <span class="text-[9px] text-white font-bold">4.0</span>
+          </div>
+          <!-- 4.5 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#00e054]/90 group-hover:bg-[#00e054] rounded-t transition-all h-[80%]"></div>
+            <span class="text-[9px] text-white font-bold">4.5</span>
+          </div>
+          <!-- 5.0 -->
+          <div class="flex-1 flex flex-col items-center gap-1 group">
+            <div class="w-full bg-[#00e054] rounded-t transition-all h-[55%]"></div>
+            <span class="text-[9px] text-white font-bold">5.0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: DETALHES DO EPISÓDIO (O MASHUP PERFEITO) -->
+  <!-- ======================================================== -->
+  <div id="episode-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-[#1b2228] border border-[#2c3642] w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl my-auto animate-scaleUp">
+      
+      <!-- Modal Hero Header with Backdrop -->
+      <div class="relative h-56 sm:h-64 w-full overflow-hidden">
+        <img id="modal-backdrop" src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1000&auto=format&fit=crop&q=80" class="w-full h-full object-cover object-center" />
+        <div class="absolute inset-0 bg-gradient-to-t from-[#1b2228] via-[#1b2228]/50 to-transparent"></div>
+        
+        <!-- Close Button -->
+        <button onclick="closeEpisodeModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-colors">
+          ✕
+        </button>
+
+        <!-- Episode Info Overlay -->
+        <div class="absolute bottom-4 left-6 right-6 flex items-end justify-between">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span id="modal-show-title" class="text-xs font-bold uppercase tracking-wider text-[#00e054]">Succession</span>
+              <span class="text-xs text-[#8b9baa]">•</span>
+              <span id="modal-code" class="text-xs font-mono bg-black/50 px-2 py-0.5 rounded text-white">S04E03</span>
+            </div>
+            <h2 id="modal-title" class="text-2xl sm:text-3xl font-extrabold text-white">Connor's Wedding</h2>
+            <div class="flex items-center gap-3 text-xs text-[#8b9baa] mt-1">
+              <span id="modal-runtime">61 min</span>
+              <span>•</span>
+              <span id="modal-date">09 de Abril, 2023</span>
+              <span>•</span>
+              <span class="text-[#ffaa00]">Nota Média: 9.9/10 (TV Time)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-6">
+        
+        <!-- Primary Action: Watched Checkbox + Letterboxd Rate Box -->
+        <div class="p-4 rounded-xl bg-[#14181c] border border-[#2c3642] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-4 w-full sm:w-auto">
+            <button id="modal-watch-btn" onclick="toggleCurrentModalWatched()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all bg-[#00e054] text-black hover:bg-[#00c749]">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span id="modal-watch-btn-text">Assistido</span>
+            </button>
+
+            <!-- Star Rating System (Letterboxd) -->
+            <div class="flex items-center gap-1 text-[#8b9baa] star-rating">
+              <span class="text-xs mr-1 text-[#687684]">Sua Nota:</span>
+              <button onclick="rateModal(1)" class="hover:text-[#00e054] p-0.5"><svg class="w-5 h-5 fill-current text-[#ffaa00]" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></button>
+              <button onclick="rateModal(2)" class="hover:text-[#00e054] p-0.5"><svg class="w-5 h-5 fill-current text-[#ffaa00]" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></button>
+              <button onclick="rateModal(3)" class="hover:text-[#00e054] p-0.5"><svg class="w-5 h-5 fill-current text-[#ffaa00]" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></button>
+              <button onclick="rateModal(4)" class="hover:text-[#00e054] p-0.5"><svg class="w-5 h-5 fill-current text-[#ffaa00]" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></button>
+              <button onclick="rateModal(5)" class="hover:text-[#00e054] p-0.5"><svg class="w-5 h-5 fill-current text-[#ffaa00]" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></button>
+              <span id="modal-rating-label" class="text-xs font-bold text-white ml-1">5.0</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 text-xs text-[#8b9baa]">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked class="accent-[#00e054] rounded" />
+              <span>Salvar no Diário</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" class="accent-[#00e054] rounded" />
+              <span>🔁 Rewatch</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Sinopse -->
+        <div>
+          <h4 class="text-xs uppercase tracking-wider font-semibold text-[#8b9baa] mb-1">Sinopse</h4>
+          <p id="modal-overview" class="text-xs sm:text-sm text-[#e1e7ed] leading-relaxed">
+            Roman, Shiv e Kendall tentam encontrar um equilíbrio emocional enquanto participam do casamento luxuoso de Connor em um barco, até que um telefonema inesperado de Tom vindo do jato particular muda para sempre os rumos da família Roy.
+          </p>
+        </div>
+
+
+
+        <!-- ======================================================== -->
+        <!-- O MURO ANTI-SPOILER: FEED DE DISCUSSÃO DO EPISÓDIO -->
+        <!-- ======================================================== -->
+        <div class="space-y-4 pt-4 border-t border-[#242d36]">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>Discussão da Comunidade</span>
+              <span class="text-xs bg-[#242f38] text-[#00e054] px-2 py-0.5 rounded-full font-mono font-normal">342 resenhas</span>
+            </h3>
+            <span class="text-xs text-[#8b9baa]">Portão Anti-Spoiler Ativo</span>
+          </div>
+
+          <!-- Unwatched Spoiler Lock Overlay (Controlled by JS) -->
+          <div id="spoiler-gate-locked" class="hidden relative rounded-xl p-8 text-center bg-gradient-to-b from-[#14181c]/90 to-[#14181c] border border-[#ffaa00]/30 overflow-hidden">
+            <div class="max-w-md mx-auto space-y-3">
+              <div class="w-12 h-12 rounded-full bg-[#ffaa00]/10 text-[#ffaa00] flex items-center justify-center mx-auto text-xl font-bold">
+                ⚠️
+              </div>
+              <h4 class="text-base font-bold text-white">Conteúdo Bloqueado para Evitar Spoilers</h4>
+              <p class="text-xs text-[#8b9baa]">
+                Você ainda não marcou este episódio como assistido. Para proteger sua experiência e não revelar reviravoltas cruciais, os comentários estão protegidos.
+              </p>
+              <div class="flex items-center justify-center gap-3 pt-2">
+                <button onclick="toggleCurrentModalWatched()" class="px-4 py-2 rounded-xl bg-[#00e054] hover:bg-[#00c749] text-black font-bold text-xs transition-colors">
+                  Marcar como Visto & Desbloquear
+                </button>
+                <button onclick="forceUnlockSpoilers()" class="text-xs text-[#8b9baa] hover:text-white underline">
+                  Ver comentários mesmo assim
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unlocked Discussion Feed -->
+          <div id="spoiler-gate-unlocked" class="space-y-3">
+            
+            <!-- Quick Input to write your own review -->
+            <div class="bg-[#14181c] border border-[#2c3642] rounded-xl p-3">
+              <textarea id="modal-new-comment" placeholder="Escreva sua análise ou reação sobre este episódio (sem medo de spoiler)..." class="w-full bg-transparent text-xs text-white placeholder-[#687684] focus:outline-none resize-none h-16"></textarea>
+              <div class="flex items-center justify-between pt-2 border-t border-[#242d36]">
+                <label class="flex items-center gap-1.5 text-xs text-[#8b9baa] cursor-pointer">
+                  <input type="checkbox" class="accent-[#ffaa00]" />
+                  <span>Contém spoilers extremos</span>
+                </label>
+                <button onclick="postComment()" class="px-4 py-1.5 rounded-lg bg-[#00e054] hover:bg-[#00c749] text-black font-bold text-xs transition-colors">
+                  Publicar Resenha
+                </button>
+              </div>
+            </div>
+
+            <!-- Existing Comments Feed -->
+            <div id="comments-list" class="space-y-3">
+              <!-- Comment 1 -->
+              <div class="bg-[#14181c] border border-[#2c3642] p-4 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=80" class="w-6 h-6 rounded-full object-cover" />
+                    <span class="text-xs font-bold text-white">Lucas Mendes</span>
+                    <span class="text-[11px] text-[#00e054]">★★★★★</span>
+                  </div>
+                  <span class="text-[11px] text-[#687684]">Há 2 dias</span>
+                </div>
+                <p class="text-xs text-[#e1e7ed] leading-relaxed">
+                  A decisão de direção de filmar 28 minutos ininterruptos com os três irmãos recebendo a notícia pelo celular sem nunca mostrar o corpo de Logan é o ápice da televisão moderna. Sarah Snook merece todos os prêmios da história por esse episódio.
+                </p>
+                <div class="flex items-center gap-4 text-[11px] text-[#8b9baa] pt-1">
+                  <button class="hover:text-[#00e054] flex items-center gap-1">❤️ <strong>142</strong></button>
+                  <button class="hover:text-white">Responder</button>
+                </div>
+              </div>
+
+              <!-- Comment 2 -->
+              <div class="bg-[#14181c] border border-[#2c3642] p-4 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&auto=format&fit=crop&q=80" class="w-6 h-6 rounded-full object-cover" />
+                    <span class="text-xs font-bold text-white">Mariana Costa</span>
+                    <span class="text-[11px] text-[#00e054]">★★★★★</span>
+                  </div>
+                  <span class="text-[11px] text-[#687684]">Há 1 semana</span>
+                </div>
+                <p class="text-xs text-[#e1e7ed] leading-relaxed">
+                  Eu passei o episódio inteiro achando que era um blefe do Logan para testar a lealdade deles na venda da Waystar. Quando a ficha finalmente caiu no barco... que soco no estômago.
+                </p>
+                <div class="flex items-center gap-4 text-[11px] text-[#8b9baa] pt-1">
+                  <button class="hover:text-[#00e054] flex items-center gap-1">❤️ <strong>89</strong></button>
+                  <button class="hover:text-white">Responder</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC & STATE PERSISTENCE -->
+  <script>
+    // State Store (simulated local reactive database)
+    const state = {
+      activeTab: 'upnext',
+      totalMinutesWatched: 49820,
+      shows: [
+        {
+          id: 'severance',
+          title: 'Severance',
+          network: 'Apple TV+',
+          poster: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'severance-2-4',
+            code: 'S02E04',
+            title: 'Woe\'s Hollow',
+            runtime: 54,
+            airDate: '12 de Maio, 2024',
+            overview: 'Mark e a equipe do Macrodata Refinement descobrem um novo setor subterrâneo enquanto Milchick intensifica as punições da Sala de Ruptura.',
+            watched: false,
+            rating: 4.5,
+            progressLabel: '3 de 10 episódios (30%)'
+          }
+        },
+        {
+          id: 'succession',
+          title: 'Succession',
+          network: 'HBO Max',
+          poster: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'succession-4-3',
+            code: 'S04E03',
+            title: 'Connor\'s Wedding',
+            runtime: 61,
+            airDate: '09 de Abril, 2023',
+            overview: 'Roman, Shiv e Kendall tentam encontrar um equilíbrio emocional no casamento de Connor até que uma ligação inesperada do avião de Logan muda tudo.',
+            watched: true,
+            rating: 5.0,
+            progressLabel: '29 de 39 episódios (74%)'
+          }
+        },
+        {
+          id: 'the-bear',
+          title: 'The Bear',
+          network: 'FX / Disney+',
+          poster: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'the-bear-3-1',
+            code: 'S03E01',
+            title: 'Tomorrow',
+            runtime: 38,
+            airDate: '26 de Junho, 2024',
+            overview: 'Carmy revisita as lições dolorosas de seu passado em cozinhas com estrelas Michelin enquanto prepara a nova fase do The Bear.',
+            watched: false,
+            rating: 4.0,
+            progressLabel: '18 de 28 episódios (64%)'
+          }
+        },
+        {
+          id: 'house-of-dragon',
+          title: 'House of the Dragon',
+          network: 'HBO Max',
+          poster: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1533613220915-609f661a6fe1?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'hotd-2-4',
+            code: 'S02E04',
+            title: 'The Red Dragon and the Gold',
+            runtime: 59,
+            airDate: '07 de Julho, 2024',
+            overview: 'A Dança dos Dragões explode em chamas nos céus de Pouso das Gralhas com o embate brutal entre Meleys, Sunfyre e Vhagar.',
+            watched: true,
+            rating: 5.0,
+            progressLabel: '14 de 18 episódios (77%)'
+          }
+        },
+        {
+          id: 'shogun',
+          title: 'Shōgun',
+          network: 'FX / Hulu',
+          poster: 'https://images.unsplash.com/photo-1528164344705-475426879c0d?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'shogun-1-9',
+            code: 'S01E09',
+            title: 'Crimson Sky',
+            runtime: 58,
+            airDate: '16 de Abril, 2024',
+            overview: 'Mariko chega ao Castelo de Osaka desafiando as ordens de Ishido, cumprindo o plano sagrado de Toranaga com determinação inabalável.',
+            watched: false,
+            rating: 5.0,
+            progressLabel: '8 de 10 episódios (80%)'
+          }
+        },
+        {
+          id: 'arcane',
+          title: 'Arcane',
+          network: 'Netflix',
+          poster: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=80',
+          backdrop: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1000&auto=format&fit=crop&q=80',
+          currentEpisode: {
+            id: 'arcane-2-1',
+            code: 'S02E01',
+            title: 'Heavy Is the Crown',
+            runtime: 44,
+            airDate: '09 de Novembro, 2024',
+            overview: 'O rescaldo do ataque de Jinx ao conselho de Piltover lança as duas cidades irmãs em um conflito total.',
+            watched: false,
+            rating: 4.5,
+            progressLabel: '9 de 18 episódios (50%)'
+          }
+        }
+      ],
+      diaryEntries: [
+        {
+          date: '15 Set 2026',
+          show: 'Succession',
+          code: 'S04E03',
+          title: 'Connor\'s Wedding',
+          poster: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=200&auto=format&fit=crop&q=80',
+          rating: '★★★★★',
+          review: 'Sem palavras. Uma aula magistral de direção teatral levada para a TV.',
+          rewatch: false
+        },
+        {
+          date: '12 Set 2026',
+          show: 'House of the Dragon',
+          code: 'S02E04',
+          title: 'The Red Dragon and the Gold',
+          poster: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=200&auto=format&fit=crop&q=80',
+          rating: '★★★★★',
+          review: 'A melhor batalha de dragões já produzida. A cena de Rhaenys e Meleys é inesquecível.',
+          rewatch: false
+        },
+        {
+          date: '08 Set 2026',
+          show: 'The Bear',
+          code: 'S02E06',
+          title: 'Fishes',
+          poster: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop&q=80',
+          rating: '★★★★★',
+          review: 'Sensação de ansiedade concentrada em 66 minutos. Jamie Lee Curtis brilhante.',
+          rewatch: true
+        },
+        {
+          date: '02 Set 2026',
+          show: 'Fleabag',
+          code: 'S02E01',
+          title: 'Episode 1 (Dinner)',
+          poster: 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=200&auto=format&fit=crop&q=80',
+          rating: '★★★★★',
+          review: 'O jantar de família mais brilhantemente escrito da comédia britânica.',
+          rewatch: true
+        }
+      ],
+      activeModalShow: null
+    };
+
+    // Tab Switching
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      const tabs = ['upnext', 'calendar', 'diary', 'lists', 'profile'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const navBtn = document.getElementById(`nav-${t}`);
+        if (view) view.classList.toggle('hidden', t !== tabId);
+        if (navBtn) {
+          if (t === tabId) {
+            navBtn.classList.remove('text-[#8b9baa]', 'hover:bg-[#1b2228]');
+            navBtn.classList.add('text-white', 'bg-[#242f38]');
+          } else {
+            navBtn.classList.remove('text-white', 'bg-[#242f38]');
+            navBtn.classList.add('text-[#8b9baa]', 'hover:bg-[#1b2228]');
+          }
+        }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Render "Up Next" Cards
+    function renderUpNext() {
+      const container = document.getElementById('upnext-grid');
+      container.innerHTML = '';
+
+      state.shows.forEach(show => {
+        const ep = show.currentEpisode;
+        const card = document.createElement('div');
+        card.className = 'group bg-[#1b2228] border border-[#2c3642] hover:border-[#384656] rounded-2xl overflow-hidden transition-all duration-200 flex flex-col justify-between shadow-sm';
+
+        card.innerHTML = `
+          <div>
+            <!-- Card Image & Header -->
+            <div class="relative h-40 overflow-hidden cursor-pointer" onclick="openEpisodeModal('${ep.id}')">
+              <img src="${show.backdrop}" alt="${show.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-[#1b2228] via-[#1b2228]/40 to-transparent"></div>
+              
+              <div class="absolute top-3 left-3">
+                <span class="text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur px-2.5 py-1 rounded-full text-white border border-white/10">
+                  ${show.network}
+                </span>
+              </div>
+
+              <div class="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                <div>
+                  <span class="text-xs font-semibold text-[#00e054]">${show.title}</span>
+                  <h3 class="text-base font-bold text-white leading-snug">${ep.code} • "${ep.title}"</h3>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Info -->
+            <div class="p-4 space-y-3">
+              <div class="flex items-center justify-between text-xs text-[#8b9baa]">
+                <span>Duração: ${ep.runtime} min</span>
+                <span>Estreia: ${ep.airDate}</span>
+              </div>
+
+              <p class="text-xs text-[#8b9baa] line-clamp-2 leading-relaxed">
+                ${ep.overview}
+              </p>
+
+              <!-- Progress bar (TV Time hallmark) -->
+              <div class="space-y-1 pt-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-[#687684]">Progresso</span>
+                  <span class="text-white font-medium">${ep.progressLabel}</span>
+                </div>
+                <div class="w-full bg-[#14181c] h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-[#00e054] h-full rounded-full" style="width: ${ep.watched ? '100%' : '75%'}"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Actions (The Watch Button) -->
+          <div class="px-4 pb-4 pt-1 flex items-center justify-between gap-2 border-t border-[#242d36]/60">
+            <button onclick="openEpisodeModal('${ep.id}')" class="text-xs text-[#8b9baa] hover:text-white px-2 py-1.5 transition-colors">
+              Ver Resenhas & Spoilers →
+            </button>
+            
+            <button onclick="toggleCardWatched('${ep.id}', event)" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              ep.watched 
+                ? 'bg-[#242f38] text-[#00e054] hover:bg-[#2c3642]' 
+                : 'bg-[#00e054] text-black hover:bg-[#00c749] shadow-sm'
+            }">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>${ep.watched ? 'Visto ✓' : 'Marcar Visto'}</span>
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Render Diary Table
+    function renderDiary() {
+      const tbody = document.getElementById('diary-table-body');
+      tbody.innerHTML = '';
+
+      state.diaryEntries.forEach(entry => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#222b34]/50 transition-colors';
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-mono text-[#8b9baa] text-xs whitespace-nowrap">${entry.date}</td>
+          <td class="py-3 px-4">
+            <img src="${entry.poster}" class="w-9 h-13 object-cover rounded shadow border border-[#2c3642]" />
+          </td>
+          <td class="py-3 px-4">
+            <div class="font-bold text-white text-sm">${entry.show}</div>
+            <div class="text-[#8b9baa] text-xs">${entry.code} • "${entry.title}"</div>
+          </td>
+          <td class="py-3 px-4">
+            <span class="text-[#00e054] text-xs font-semibold">${entry.rating}</span>
+          </td>
+          <td class="py-3 px-4 text-xs text-[#8b9baa] max-w-xs truncate">
+            "${entry.review}"
+          </td>
+          <td class="py-3 px-4 text-center">
+            ${entry.rewatch ? '<span class="text-xs text-[#40bcf4]" title="Rewatch">🔁</span>' : '<span class="text-[#687684]">—</span>'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('profile-reviews-count').innerText = state.diaryEntries.length + 83;
+    }
+
+    // Toggle Episode Watched Status
+    function toggleCardWatched(epId, event) {
+      if (event) event.stopPropagation();
+      const show = state.shows.find(s => s.currentEpisode.id === epId);
+      if (!show) return;
+
+      const ep = show.currentEpisode;
+      ep.watched = !ep.watched;
+
+      if (ep.watched) {
+        state.totalMinutesWatched += ep.runtime;
+        // Add to diary
+        state.diaryEntries.unshift({
+          date: 'Hoje',
+          show: show.title,
+          code: ep.code,
+          title: ep.title,
+          poster: show.poster,
+          rating: '★★★★★',
+          review: 'Marcado como visto pelo painel rápido.',
+          rewatch: false
+        });
+      } else {
+        state.totalMinutesWatched -= ep.runtime;
+      }
+
+      updateLifetimeStats();
+      renderUpNext();
+      renderDiary();
+    }
+
+    function updateLifetimeStats() {
+      const days = Math.floor(state.totalMinutesWatched / (60 * 24));
+      const hours = Math.floor((state.totalMinutesWatched % (60 * 24)) / 60);
+      const str = `${days}d ${hours}h`;
+      document.getElementById('header-watchtime').innerText = str;
+      document.getElementById('profile-lifetime-time').innerText = `${days}d ${hours}h 12m`;
+    }
+
+    // Open Episode Detail Modal
+    function openEpisodeModal(epId) {
+      let targetShow = state.shows.find(s => s.currentEpisode.id === epId);
+      if (!targetShow) {
+        targetShow = state.shows[1]; // fallback to Succession
+      }
+      state.activeModalShow = targetShow;
+      const ep = targetShow.currentEpisode;
+
+      document.getElementById('modal-backdrop').src = targetShow.backdrop;
+      document.getElementById('modal-show-title').innerText = targetShow.title;
+      document.getElementById('modal-code').innerText = ep.code;
+      document.getElementById('modal-title').innerText = ep.title;
+      document.getElementById('modal-runtime').innerText = `${ep.runtime} min`;
+      document.getElementById('modal-date').innerText = ep.airDate;
+      document.getElementById('modal-overview').innerText = ep.overview;
+
+      syncModalWatchedUI(ep.watched);
+
+      document.getElementById('episode-modal').classList.remove('hidden');
+    }
+
+    function closeEpisodeModal() {
+      document.getElementById('episode-modal').classList.add('hidden');
+    }
+
+    function syncModalWatchedUI(isWatched) {
+      const btn = document.getElementById('modal-watch-btn');
+      const text = document.getElementById('modal-watch-btn-text');
+      const spoilerLocked = document.getElementById('spoiler-gate-locked');
+      const spoilerUnlocked = document.getElementById('spoiler-gate-unlocked');
+
+      if (isWatched) {
+        btn.className = 'w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all bg-[#242f38] text-[#00e054] hover:bg-[#2c3642]';
+        text.innerText = 'Visto ✓';
+        spoilerLocked.classList.add('hidden');
+        spoilerUnlocked.classList.remove('hidden');
+      } else {
+        btn.className = 'w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all bg-[#00e054] text-black hover:bg-[#00c749] shadow-md';
+        text.innerText = 'Marcar como Assistido';
+        spoilerLocked.classList.remove('hidden');
+        spoilerUnlocked.classList.add('hidden');
+      }
+    }
+
+    function toggleCurrentModalWatched() {
+      if (!state.activeModalShow) return;
+      const ep = state.activeModalShow.currentEpisode;
+      ep.watched = !ep.watched;
+      syncModalWatchedUI(ep.watched);
+      renderUpNext();
+      updateLifetimeStats();
+    }
+
+    function forceUnlockSpoilers() {
+      document.getElementById('spoiler-gate-locked').classList.add('hidden');
+      document.getElementById('spoiler-gate-unlocked').classList.remove('hidden');
+    }
+
+    function rateModal(stars) {
+      document.getElementById('modal-rating-label').innerText = `${stars}.0`;
+    }
+
+
+    function postComment() {
+      const input = document.getElementById('modal-new-comment');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const list = document.getElementById('comments-list');
+      const comment = document.createElement('div');
+      comment.className = 'bg-[#14181c] border border-[#00e054]/40 p-4 rounded-xl space-y-2 animate-fadeIn';
+      comment.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80" class="w-6 h-6 rounded-full object-cover ring-1 ring-[#00e054]" />
+            <span class="text-xs font-bold text-white">Rodrigo Pessotti</span>
+            <span class="text-[11px] text-[#00e054]">★★★★★</span>
+          </div>
+          <span class="text-[11px] text-[#00e054] font-semibold">Agora</span>
+        </div>
+        <p class="text-xs text-[#e1e7ed] leading-relaxed">${text}</p>
+        <div class="flex items-center gap-4 text-[11px] text-[#8b9baa] pt-1">
+          <button class="text-[#00e054] flex items-center gap-1">❤️ <strong>1</strong></button>
+          <span class="text-[10px] text-[#687684]">• Sua resenha está visível</span>
+        </div>
+      `;
+      list.prepend(comment);
+      input.value = '';
+    }
+
+    // Initialize
+    renderUpNext();
+    renderDiary();
+    updateLifetimeStats();
+  </script>
+</body>
+</html>
