@@ -104,21 +104,3 @@ export interface UserList {
   userLiked?: boolean;
   createdAt: string;
 }
-
-export interface CalendarRelease {
-  id: string;
-  showId: string;
-  showTitle: string;
-  network: string;
-  episodeCode: string;
-  episodeTitle: string;
-  airDate: string; // ISO or formatted
-  rawAirDate: string; // YYYY-MM-DD
-  timeBRT: string;
-  posterUrl: string;
-  backdropUrl: string;
-  episode: Episode;
-  isToday: boolean;
-  isAvailable: boolean;
-  daysRemaining: number;
-}

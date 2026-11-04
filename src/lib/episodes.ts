@@ -149,19 +149,20 @@ export function formatWatchDate(date: Date = new Date()): string {
 
 const seasonCache = new Map<string, Promise<SeasonInfo | null>>();
 
-/** Ajusta os episódios vindos do TMDB para os IDs e metadados da série local. */
-function normalizeSeason(show: Show, season: SeasonInfo): SeasonInfo {
+/** Ajusta um episódio vindo do TMDB para o ID e os metadados da série local. */
+function normalizeEpisode(show: Show, ep: Episode): Episode {
   return {
-    ...season,
-    episodes: (season.episodes || []).map((ep) => ({
-      ...ep,
-      id: makeEpisodeId(show.id, ep.seasonNumber, ep.episodeNumber),
-      showId: show.id,
-      showTitle: show.title,
-      network: show.network,
-      backdropUrl: ep.backdropUrl || show.backdropUrl,
-    })),
+    ...ep,
+    id: makeEpisodeId(show.id, ep.seasonNumber, ep.episodeNumber),
+    showId: show.id,
+    showTitle: show.title,
+    network: show.network,
+    backdropUrl: ep.backdropUrl || show.backdropUrl,
   };
+}
+
+function normalizeSeason(show: Show, season: SeasonInfo): SeasonInfo {
+  return { ...season, episodes: (season.episodes || []).map((ep) => normalizeEpisode(show, ep)) };
 }
 
 export async function fetchSeason(show: Show, season: number): Promise<SeasonInfo | null> {
@@ -185,4 +186,58 @@ export async function fetchSeason(show: Show, season: number): Promise<SeasonInf
 export async function fetchEpisode(show: Show, ref: EpisodeRef): Promise<Episode | null> {
   const season = await fetchSeason(show, ref.season);
   return season?.episodes?.find((e) => compareRefs(refOf(e), ref) === 0) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Agenda de transmissão (calendário)
+// ---------------------------------------------------------------------------
+
+export interface ShowSchedule {
+  status: string;
+  nextAirDate: string | null;
+  episodes: Episode[];
+}
+
+const scheduleCache = new Map<string, Promise<ShowSchedule | null>>();
+
+/** Episódios da série que estreiam a partir de `since` (YYYY-MM-DD). */
+export async function fetchSchedule(show: Show, since: string): Promise<ShowSchedule | null> {
+  if (!show.tmdbId) return null;
+  const key = `${show.tmdbId}-${since}`;
+  let pending = scheduleCache.get(key);
+  if (!pending) {
+    pending = fetch(`/api/tmdb/schedule/${show.tmdbId}?since=${since}`)
+      .then(async (res) => (res.ok ? ((await res.json()).schedule as ShowSchedule) : null))
+      .catch(() => null);
+    scheduleCache.set(key, pending);
+    pending.then((result) => {
+      if (!result) scheduleCache.delete(key);
+    });
+  }
+  const result = await pending;
+  return result ? { ...result, episodes: result.episodes.map((ep) => normalizeEpisode(show, ep)) } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Datas locais no formato YYYY-MM-DD (sem conversão para UTC)
+// ---------------------------------------------------------------------------
+
+export function toISODate(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+export function parseISODate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function addDays(iso: string, days: number): string {
+  const date = parseISODate(iso);
+  date.setDate(date.getDate() + days);
+  return toISODate(date);
+}
+
+/** Diferença em dias entre duas datas ISO (b - a). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((parseISODate(b).getTime() - parseISODate(a).getTime()) / 86_400_000);
 }

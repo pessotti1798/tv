@@ -461,6 +461,7 @@ export default function Home() {
             onSelectEpisode={openEpisode}
             onToggleWatch={handleToggleWatch}
             onOpenSearch={() => setIsSearchOpen(true)}
+            onOpenShowDetails={openShowDetails}
           />
         )}
 

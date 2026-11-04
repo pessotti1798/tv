@@ -194,3 +194,55 @@ export async function getTMDBTrendingShows() {
   }));
 }
 
+
+// ---------------------------------------------------------------------------
+// Agenda de transmissão (calendário)
+// ---------------------------------------------------------------------------
+
+interface TMDBEpisodeStub {
+  season_number: number;
+  episode_number: number;
+  air_date: string | null;
+}
+
+interface TMDBShowSchedule {
+  status?: string;
+  next_episode_to_air?: TMDBEpisodeStub | null;
+  last_episode_to_air?: TMDBEpisodeStub | null;
+}
+
+export interface AirSchedule {
+  /** Status da série no TMDB, ex.: "Returning Series", "Ended". */
+  status: string;
+  /** Data (YYYY-MM-DD) do próximo episódio anunciado, se houver. */
+  nextAirDate: string | null;
+  /** Episódios da(s) temporada(s) em exibição com data a partir de `since`. */
+  episodes: Episode[];
+}
+
+/**
+ * Agenda de uma série: episódios que estreiam a partir de `since` (YYYY-MM-DD),
+ * vindos das temporadas do último e do próximo episódio anunciados.
+ */
+export async function getTMDBAirSchedule(tmdbId: number | string, since: string): Promise<AirSchedule | null> {
+  const show = await fetchTMDB<TMDBShowSchedule>(`/tv/${tmdbId}`);
+  if (!show) return null;
+
+  const seasonNumbers = new Set<number>();
+  for (const ep of [show.last_episode_to_air, show.next_episode_to_air]) {
+    if (ep && ep.season_number > 0) seasonNumbers.add(ep.season_number);
+  }
+
+  const seasons = await Promise.all([...seasonNumbers].map((n) => getTMDBSeasonDetails(tmdbId, n)));
+  const episodes = seasons
+    .flatMap((s) => s?.episodes ?? [])
+    // airDate vem como "YYYY-MM-DD" (ou "—" quando não há data); comparação de string serve.
+    .filter((ep) => /^\d{4}-\d{2}-\d{2}$/.test(ep.airDate) && ep.airDate >= since)
+    .sort((a, b) => a.airDate.localeCompare(b.airDate) || a.episodeNumber - b.episodeNumber);
+
+  return {
+    status: show.status ?? "",
+    nextAirDate: show.next_episode_to_air?.air_date ?? null,
+    episodes,
+  };
+}

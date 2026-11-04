@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { Show, Episode, CalendarRelease } from "@/types";
-import { Clock, Check, Bell, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Show, Episode } from "@/types";
+import { Clock, Check, Calendar as CalendarIcon, Sparkles, Plus, Layers, Loader2, AlertTriangle } from "lucide-react";
+import { ShowSchedule, addDays, daysBetween, fetchSchedule, parseISODate, toISODate } from "@/lib/episodes";
 
 interface CalendarSectionProps {
   shows: Show[];
@@ -10,6 +11,47 @@ interface CalendarSectionProps {
   onSelectEpisode: (episode: Episode) => void;
   onToggleWatch: (episode: Episode) => void;
   onOpenSearch: () => void;
+  onOpenShowDetails: (show: Show) => void;
+}
+
+type FilterView = "week" | "month" | "all";
+
+/** Quantos dias à frente cada filtro mostra. */
+const HORIZON_DAYS: Record<FilterView, number> = { week: 7, month: 30, all: Infinity };
+
+/** Episódios lançados nos últimos dias também aparecem, como "saiu recentemente". */
+const RECENT_DAYS = 7;
+
+/** Um card: um ou mais episódios da mesma série no mesmo dia (ex.: temporada inteira lançada de uma vez). */
+interface ReleaseItem {
+  key: string;
+  show: Show;
+  airDate: string;
+  episodes: Episode[];
+}
+
+function dayLabel(today: string, iso: string): string {
+  const diff = daysBetween(today, iso);
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Amanhã";
+  if (diff === -1) return "Ontem";
+  const label = parseISODate(iso).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function shortDate(iso: string): string {
+  return parseISODate(iso).toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function relativeDays(today: string, iso: string): string {
+  const diff = daysBetween(today, iso);
+  if (diff === 0) return "Disponível hoje";
+  if (diff < 0) return diff === -1 ? "Saiu ontem" : `Saiu há ${-diff} dias`;
+  return diff === 1 ? "Estreia amanhã" : `Estreia em ${diff} dias`;
 }
 
 export const CalendarSection: React.FC<CalendarSectionProps> = ({
@@ -18,138 +60,208 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   onSelectEpisode,
   onToggleWatch,
   onOpenSearch,
+  onOpenShowDetails,
 }) => {
-  const [filterView, setFilterView] = useState<"week" | "month" | "all">("week");
+  const [filterView, setFilterView] = useState<FilterView>("week");
+  const [today] = useState(() => toISODate(new Date()));
+  const since = addDays(today, -RECENT_DAYS);
 
-  // Derive calendar schedule from user's active shows
-  const releases = useMemo<CalendarRelease[]>(() => {
-    const list: CalendarRelease[] = [];
+  // Agenda por série (ID local). `null` = falhou; ausente = ainda carregando.
+  const [schedules, setSchedules] = useState<Record<string, ShowSchedule | null>>({});
 
-    // Fallback baseline upcoming schedule items so the timeline is never blank
-    const baselineEpisodes: Partial<CalendarRelease>[] = [
-      {
-        id: "cal-slow-horses",
-        showId: "slow-horses",
-        showTitle: "Slow Horses",
-        network: "Apple TV+",
-        episodeCode: "S04E04",
-        episodeTitle: "Returns",
-        airDate: "Hoje • 22:00 BRT",
-        rawAirDate: new Date().toISOString().split("T")[0],
-        timeBRT: "22:00 BRT",
-        posterUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80",
-        backdropUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=80",
-        isToday: true,
-        isAvailable: true,
-        daysRemaining: 0,
-      },
-      {
-        id: "cal-omitb",
-        showId: "omitb",
-        showTitle: "Only Murders in the Building",
-        network: "Disney+ / Hulu",
-        episodeCode: "S04E05",
-        episodeTitle: "Adaptation",
-        airDate: "Nesta Terça • 04:00 BRT",
-        rawAirDate: "",
-        timeBRT: "04:00 BRT",
-        posterUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=200&auto=format&fit=crop&q=80",
-        backdropUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&auto=format&fit=crop&q=80",
-        isToday: false,
-        isAvailable: false,
-        daysRemaining: 2,
-      },
-      {
-        id: "cal-penguin",
-        showId: "the-penguin",
-        showTitle: "The Penguin",
-        network: "HBO Max",
-        episodeCode: "S01E02",
-        episodeTitle: "Inside Man",
-        airDate: "Domingo • 22:00 BRT",
-        rawAirDate: "",
-        timeBRT: "22:00 BRT",
-        posterUrl: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=200&auto=format&fit=crop&q=80",
-        backdropUrl: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200&auto=format&fit=crop&q=80",
-        isToday: false,
-        isAvailable: false,
-        daysRemaining: 5,
-      },
-    ];
+  const trackedShows = useMemo(() => shows.filter((s) => s.tmdbId), [shows]);
+  const trackedKey = trackedShows.map((s) => s.id).join(",");
 
-    // Map active shows
-    shows.forEach((show) => {
-      if (show.completed || !show.currentEpisode) return;
-      const ep = show.currentEpisode;
-
-      list.push({
-        id: `cal-${ep.id}`,
-        showId: show.id,
-        showTitle: show.title,
-        network: show.network,
-        episodeCode: ep.code,
-        episodeTitle: ep.title,
-        airDate: ep.airDate || "Em breve",
-        rawAirDate: "",
-        timeBRT: "21:00 BRT",
-        posterUrl: show.posterUrl,
-        backdropUrl: ep.stillUrl || show.backdropUrl,
-        episode: ep,
-        isToday: ep.airDate?.toLowerCase().includes("hoje") || false,
-        isAvailable: true,
-        daysRemaining: 1,
+  useEffect(() => {
+    let isMounted = true;
+    trackedShows.forEach((show) => {
+      fetchSchedule(show, since).then((result) => {
+        if (isMounted) setSchedules((prev) => ({ ...prev, [show.id]: result }));
       });
     });
+    return () => {
+      isMounted = false;
+    };
+    // Só refaz a busca quando o conjunto de séries muda (não a cada episódio marcado).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackedKey, since]);
 
-    // If user has shows, merge them with baseline; else show baseline
-    if (list.length === 0) {
-      return baselineEpisodes.map((item, idx) => ({
-        id: item.id || `cal-${idx}`,
-        showId: item.showId || "",
-        showTitle: item.showTitle || "",
-        network: item.network || "TV",
-        episodeCode: item.episodeCode || "S01E01",
-        episodeTitle: item.episodeTitle || "Episódio",
-        airDate: item.airDate || "",
-        rawAirDate: item.rawAirDate || "",
-        timeBRT: item.timeBRT || "22:00 BRT",
-        posterUrl: item.posterUrl || "",
-        backdropUrl: item.backdropUrl || "",
-        isToday: !!item.isToday,
-        isAvailable: !!item.isAvailable,
-        daysRemaining: item.daysRemaining || 0,
-        episode: {
-          id: item.id || `ep-${idx}`,
-          showId: item.showId || "",
-          showTitle: item.showTitle || "",
-          network: item.network || "",
-          seasonNumber: 1,
-          episodeNumber: 1,
-          code: item.episodeCode || "S01E01",
-          title: item.episodeTitle || "",
-          runtime: 55,
-          airDate: item.airDate || "",
-          overview: "Novo episódio com lançamento agendado na programação oficial.",
-          stillUrl: item.backdropUrl || "",
-          backdropUrl: item.backdropUrl || "",
-          averageRating: 8.9,
-        },
-      }));
-    }
+  const isLoading = trackedShows.some((s) => !(s.id in schedules));
+  const failedShows = trackedShows.filter((s) => s.id in schedules && schedules[s.id] === null);
 
-    return list;
-  }, [shows]);
+  // Todos os lançamentos conhecidos, agrupados por série + dia.
+  const allItems = useMemo<ReleaseItem[]>(() => {
+    const items: ReleaseItem[] = [];
+    trackedShows.forEach((show) => {
+      const byDay = new Map<string, Episode[]>();
+      (schedules[show.id]?.episodes ?? []).forEach((ep) => {
+        byDay.set(ep.airDate, [...(byDay.get(ep.airDate) ?? []), ep]);
+      });
+      byDay.forEach((episodes, airDate) => {
+        items.push({ key: `${show.id}-${airDate}`, show, airDate, episodes });
+      });
+    });
+    return items.sort((a, b) => a.airDate.localeCompare(b.airDate) || a.show.title.localeCompare(b.show.title));
+  }, [trackedShows, schedules]);
 
-  const filteredReleases = useMemo(() => {
-    if (filterView === "week") {
-      return releases.slice(0, 6);
-    }
-    return releases;
-  }, [releases, filterView]);
+  const horizon = HORIZON_DAYS[filterView];
+  const visibleItems = allItems.filter((item) => daysBetween(today, item.airDate) <= horizon);
+
+  // Agrupa por dia para a linha do tempo.
+  const days = useMemo(() => {
+    const map = new Map<string, ReleaseItem[]>();
+    visibleItems.forEach((item) => map.set(item.airDate, [...(map.get(item.airDate) ?? []), item]));
+    return [...map.entries()];
+  }, [visibleItems]);
+
+  const recentDays = days.filter(([date]) => date < today);
+  const upcomingDays = days.filter(([date]) => date >= today);
+
+  // Séries sem lançamento no período visível, mas com informação útil.
+  const showsWithItems = new Set(visibleItems.map((i) => i.show.id));
+  const laterReleases = trackedShows
+    .filter((s) => !showsWithItems.has(s.id) && schedules[s.id]?.nextAirDate)
+    .map((s) => ({ show: s, date: schedules[s.id]!.nextAirDate! }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const awaitingDate = trackedShows.filter(
+    (s) =>
+      !showsWithItems.has(s.id) &&
+      !schedules[s.id]?.nextAirDate &&
+      schedules[s.id]?.status === "Returning Series"
+  );
+
+  const filterButton = (view: FilterView, label: string) => (
+    <button
+      onClick={() => setFilterView(view)}
+      className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+        filterView === view ? "bg-[#242f38] text-white" : "text-[#8b9baa] hover:text-white"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const renderItem = (item: ReleaseItem) => {
+    const { show, episodes, airDate } = item;
+    const isSingle = episodes.length === 1;
+    const first = episodes[0];
+    const last = episodes[episodes.length - 1];
+    const hasAired = airDate <= today;
+    const watchedCount = episodes.filter((ep) => watchedEpisodes[ep.id]).length;
+    const allWatched = watchedCount === episodes.length;
+
+    return (
+      <div
+        key={item.key}
+        className="bg-[#1b2228] border border-[#2c3642] hover:border-[#384656] p-4 rounded-2xl flex gap-4 transition-all group shadow-sm flex-col justify-between"
+      >
+        <div className="flex gap-4">
+          <div
+            className="w-20 h-28 rounded-xl bg-[#2c3642] shrink-0 overflow-hidden cursor-pointer relative"
+            onClick={() => (isSingle ? onSelectEpisode(first) : onOpenShowDetails(show))}
+          >
+            <img
+              src={show.posterUrl}
+              alt={show.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            {allWatched && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <Check className="w-5 h-5 text-[#00e054] stroke-[3]" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 flex flex-col justify-between min-w-0">
+            <div>
+              <div className="flex items-center justify-between text-xs gap-2">
+                <span className="text-[#00e054] font-semibold truncate">{show.network}</span>
+                <span className="text-[11px] text-[#8b9baa] font-mono shrink-0">
+                  {isSingle ? first.code : `${first.code}–E${String(last.episodeNumber).padStart(2, "0")}`}
+                </span>
+              </div>
+
+              <h3 className="text-base font-bold text-white mt-0.5 truncate">{show.title}</h3>
+
+              <p className="text-xs text-[#8b9baa] line-clamp-1 mt-0.5">
+                {isSingle
+                  ? <>&ldquo;{first.title}&rdquo;</>
+                  : `Temporada ${first.seasonNumber} • ${episodes.length} episódios de uma vez`}
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center gap-1.5">
+              {hasAired ? (
+                <span className="text-[11px] text-[#00e054] font-semibold flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {relativeDays(today, airDate)}
+                </span>
+              ) : (
+                <span className="text-[11px] text-[#ffaa00] font-medium flex items-center gap-1">
+                  <CalendarIcon className="w-3 h-3" />
+                  {relativeDays(today, airDate)}
+                </span>
+              )}
+              {!isSingle && watchedCount > 0 && (
+                <span className="text-[11px] text-[#8b9baa]">• {watchedCount}/{episodes.length} vistos</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-[#242d36] flex items-center justify-between gap-2 text-xs">
+          {isSingle ? (
+            <button
+              onClick={() => onSelectEpisode(first)}
+              className="text-[#8b9baa] hover:text-white transition-colors cursor-pointer px-1"
+            >
+              Ficha
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {isSingle && hasAired ? (
+            <button
+              onClick={() => onToggleWatch(first)}
+              className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
+                allWatched ? "bg-[#242f38] text-[#00e054]" : "bg-[#00e054] text-black hover:bg-[#00c749]"
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <span>{allWatched ? "Assistido ✓" : "Marcar Visto"}</span>
+            </button>
+          ) : isSingle ? (
+            <span className="text-[11px] text-[#8b9baa]">Ainda não lançado</span>
+          ) : (
+            <button
+              onClick={() => onOpenShowDetails(show)}
+              className="px-3 py-1.5 rounded-lg font-semibold text-xs bg-[#242f38] text-white hover:bg-[#2c3642] transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Ver episódios</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDays = (list: [string, ReleaseItem[]][]) =>
+    list.map(([date, items]) => (
+      <div key={date} className="space-y-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className={date === today ? "text-[#00e054]" : ""}>{dayLabel(today, date)}</span>
+          {Math.abs(daysBetween(today, date)) <= 1 && (
+            <span className="text-xs font-normal text-[#8b9baa]">{shortDate(date)}</span>
+          )}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{items.map(renderItem)}</div>
+      </div>
+    ));
 
   return (
     <section className="space-y-8 animate-fadeIn">
-      
       {/* Header */}
       <div className="pb-4 border-b border-[#242d36] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -157,141 +269,125 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             <span className="w-2 h-2 rounded-full bg-[#00e054] inline-block animate-pulse"></span>
             <span>Linha do Tempo de Transmissão</span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white mt-1">
-            Calendário de Estreias
-          </h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-white mt-1">Calendário de Estreias</h1>
           <p className="text-sm text-[#8b9baa]">
-            Próximos episódios a serem transmitidos pelas emissoras e serviços de streaming.
+            Próximos episódios das séries no seu Radar, com datas do TMDB.
           </p>
         </div>
 
-        {/* Filter Switcher */}
         <div className="flex items-center gap-2 bg-[#1b2228] p-1 rounded-xl border border-[#2c3642] text-xs">
-          <button
-            onClick={() => setFilterView("week")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-              filterView === "week"
-                ? "bg-[#242f38] text-white"
-                : "text-[#8b9baa] hover:text-white"
-            }`}
-          >
-            Esta Semana
-          </button>
-          <button
-            onClick={() => setFilterView("month")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-              filterView === "month"
-                ? "bg-[#242f38] text-white"
-                : "text-[#8b9baa] hover:text-white"
-            }`}
-          >
-            Mês
-          </button>
-          <button
-            onClick={() => setFilterView("all")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-              filterView === "all"
-                ? "bg-[#242f38] text-white"
-                : "text-[#8b9baa] hover:text-white"
-            }`}
-          >
-            Todos ({releases.length})
-          </button>
+          {filterButton("week", "7 dias")}
+          {filterButton("month", "30 dias")}
+          {filterButton("all", `Todos (${allItems.length})`)}
         </div>
       </div>
 
-      {/* Grid of Releases */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredReleases.map((item) => {
-          const isWatched = !!watchedEpisodes[item.episode.id];
-
-          return (
-            <div
-              key={item.id}
-              className="bg-[#1b2228] border border-[#2c3642] hover:border-[#384656] p-4 rounded-2xl flex gap-4 transition-all group shadow-sm flex-col justify-between"
-            >
-              <div className="flex gap-4">
-                <div
-                  className="w-20 h-28 rounded-xl bg-[#2c3642] shrink-0 overflow-hidden cursor-pointer relative"
-                  onClick={() => onSelectEpisode(item.episode)}
-                >
-                  <img
-                    src={item.posterUrl}
-                    alt={item.showTitle}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {isWatched && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <Check className="w-5 h-5 text-[#00e054] stroke-[3]" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 flex flex-col justify-between min-w-0">
-                  <div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#00e054] font-semibold truncate max-w-[130px]">
-                        {item.network}
-                      </span>
-                      <span className="text-[11px] text-[#8b9baa] font-mono shrink-0">
-                        {item.timeBRT}
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-white mt-0.5 truncate">
-                      {item.showTitle}
-                    </h3>
-
-                    <p className="text-xs text-[#8b9baa] line-clamp-1 mt-0.5">
-                      {item.episodeCode} • &ldquo;{item.episodeTitle}&rdquo;
-                    </p>
-                  </div>
-
-                  <div className="pt-2 flex items-center gap-1.5">
-                    {item.isToday ? (
-                      <span className="text-[11px] text-[#00e054] font-semibold flex items-center gap-1">
-                        <Clock className="w-3 h-3 animate-pulse" />
-                        Disponível hoje
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-[#ffaa00] font-medium flex items-center gap-1">
-                        <CalendarIcon className="w-3 h-3" />
-                        {item.airDate}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="pt-3 border-t border-[#242d36] flex items-center justify-between gap-2 text-xs">
-                <button
-                  onClick={() => onSelectEpisode(item.episode)}
-                  className="text-[#8b9baa] hover:text-white transition-colors cursor-pointer px-1"
-                >
-                  Ficha
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onToggleWatch(item.episode)}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
-                      isWatched
-                        ? "bg-[#242f38] text-[#00e054]"
-                        : "bg-[#00e054] text-black hover:bg-[#00c749]"
-                    }`}
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>{isWatched ? "Assistido ✓" : "Marcar Visto"}</span>
-                  </button>
-                </div>
-              </div>
-
+      {trackedShows.length === 0 ? (
+        <div className="bg-[#1b2228] border border-dashed border-[#2c3642] rounded-2xl p-10 flex flex-col items-center text-center gap-4">
+          <Sparkles className="w-8 h-8 text-[#00e054]" />
+          <div>
+            <h3 className="text-lg font-bold text-white">Nenhuma série para acompanhar</h3>
+            <p className="text-sm text-[#8b9baa] max-w-md mt-1">
+              Adicione séries do TMDB ao seu Radar para ver aqui as datas dos próximos episódios.
+            </p>
+          </div>
+          <button
+            onClick={onOpenSearch}
+            className="px-4 py-2 rounded-xl bg-[#00e054] hover:bg-[#00c749] text-black font-bold text-sm flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Adicionar Série</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-[#8b9baa]">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Consultando a agenda no TMDB...</span>
             </div>
-          );
-        })}
-      </div>
+          )}
 
+          {failedShows.length > 0 && (
+            <div className="bg-[#2a1f14] border border-[#ffaa00]/30 text-[#ffcc80] rounded-xl p-3 text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {failedShows.length === trackedShows.length
+                  ? "Não foi possível consultar o TMDB. Verifique a chave TMDB_API_KEY em .env.local."
+                  : `Não foi possível carregar a agenda de: ${failedShows.map((s) => s.title).join(", ")}.`}
+              </span>
+            </div>
+          )}
+
+          {!isLoading && visibleItems.length === 0 && failedShows.length < trackedShows.length && (
+            <div className="bg-[#1b2228] border border-[#2c3642] rounded-2xl p-8 text-center">
+              <CalendarIcon className="w-7 h-7 text-[#8b9baa] mx-auto mb-2" />
+              <p className="text-sm text-white font-semibold">
+                {filterView === "all"
+                  ? "Nenhum episódio anunciado para as séries do seu Radar."
+                  : `Nenhum episódio nos próximos ${horizon} dias.`}
+              </p>
+              {filterView !== "all" && allItems.length > 0 && (
+                <button
+                  onClick={() => setFilterView("all")}
+                  className="text-xs text-[#00e054] hover:underline mt-2 cursor-pointer"
+                >
+                  Ver todas as datas anunciadas
+                </button>
+              )}
+            </div>
+          )}
+
+          {recentDays.length > 0 && (
+            <div className="space-y-5">
+              <h2 className="text-xs font-semibold tracking-wider text-[#8b9baa] uppercase">
+                Saiu recentemente
+              </h2>
+              {renderDays(recentDays)}
+            </div>
+          )}
+
+          {upcomingDays.length > 0 && (
+            <div className="space-y-5">
+              <h2 className="text-xs font-semibold tracking-wider text-[#8b9baa] uppercase">Próximas estreias</h2>
+              {renderDays(upcomingDays)}
+            </div>
+          )}
+
+          {(laterReleases.length > 0 || awaitingDate.length > 0) && (
+            <div className="pt-4 border-t border-[#242d36] grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+              {laterReleases.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold tracking-wider text-[#8b9baa] uppercase mb-2">
+                    Mais adiante
+                  </h3>
+                  <ul className="space-y-1">
+                    {laterReleases.map(({ show, date }) => (
+                      <li key={show.id} className="flex justify-between gap-3">
+                        <button
+                          onClick={() => onOpenShowDetails(show)}
+                          className="text-white hover:text-[#00e054] truncate cursor-pointer text-left"
+                        >
+                          {show.title}
+                        </button>
+                        <span className="text-[#8b9baa] shrink-0">{shortDate(date)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {awaitingDate.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold tracking-wider text-[#8b9baa] uppercase mb-2">
+                    Renovadas, sem data anunciada
+                  </h3>
+                  <p className="text-[#8b9baa]">{awaitingDate.map((s) => s.title).join(" • ")}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 };
