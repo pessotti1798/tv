@@ -2,12 +2,13 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { TrackedShow } from "@/types";
+import { Show } from "@/types";
 import { useEpisodic } from "@/components/EpisodicProvider";
 import { DETAIL_TEXT, GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 
-function summary(show: TrackedShow): string {
+/** "N temporadas · N episódios". */
+export function seasonSummary(show: Show): string {
   // Conta só temporadas com episódios (as apenas anunciadas vêm do TMDB com 0).
   const count = show.seasons ? show.seasons.filter((s) => s.episodeCount > 0).length : show.totalSeasons;
   return `${count} temporada${count === 1 ? "" : "s"} · ${show.totalEpisodes} episódios`;
@@ -47,7 +48,7 @@ export default function CompletedPage() {
                 >
                   {show.title}
                 </Link>
-                <span className={`${GRAY} ${STACKED_ROW_GAP}`}>{summary(show)}</span>
+                <span className={`${GRAY} ${STACKED_ROW_GAP}`}>{seasonSummary(show)}</span>
               </div>
             ))
           )}

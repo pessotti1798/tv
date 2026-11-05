@@ -129,10 +129,14 @@ export interface ShowSearchResult {
   tmdbId: number;
   title: string;
   firstAirYear: string;
+  /** Data de estreia (YYYY-MM-DD), quando o TMDB informa. */
+  firstAirDate?: string;
   posterUrl: string;
   backdropUrl: string;
   overview: string;
   voteAverage: number;
+  /** Quantidade de votos no TMDB. */
+  voteCount?: number;
 }
 
 /** Como registrar uma sessão no diário (opções da ficha do episódio). */

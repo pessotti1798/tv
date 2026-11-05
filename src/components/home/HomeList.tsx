@@ -143,6 +143,9 @@ export default function HomeList() {
       </div>
 
       <nav aria-label="Outras seções" className={`${LIGHT_GRAY} text-sm pb-8 flex flex-wrap justify-center gap-x-4`}>
+        <Link href={withAlign("/lancamentos", align)} className="hover:text-black">
+          lançamentos
+        </Link>
         {completedCount > 0 && (
           <Link href={withAlign("/concluidas", align)} className="hover:text-black">
             concluídas ({completedCount})

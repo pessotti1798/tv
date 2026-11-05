@@ -19,6 +19,7 @@ interface TMDBShowListItem {
   backdrop_path?: string | null;
   overview?: string;
   vote_average?: number;
+  vote_count?: number;
 }
 
 interface TMDBEpisode {
@@ -65,6 +66,8 @@ interface TMDBShowDetails extends TMDBShowListItem {
 
 interface TMDBPaged<T> {
   results?: T[];
+  page?: number;
+  total_pages?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,10 +132,12 @@ function toSearchResult(item: TMDBShowListItem): ShowSearchResult {
     tmdbId: item.id,
     title: item.name || item.original_name || "Sem título",
     firstAirYear: yearOf(item.first_air_date),
+    firstAirDate: item.first_air_date || undefined,
     posterUrl: getTMDBImageUrl(item.poster_path, "w500"),
     backdropUrl: getTMDBImageUrl(item.backdrop_path, "w1280"),
     overview: item.overview || "Sem sinopse disponível em português.",
     voteAverage: roundRating(item.vote_average),
+    voteCount: item.vote_count ?? 0,
   };
 }
 
@@ -168,6 +173,36 @@ export async function searchTMDBShows(query: string): Promise<ShowSearchResult[]
   if (!query.trim()) return [];
   const data = await fetchTMDB<TMDBPaged<TMDBShowListItem>>("/search/tv", { query });
   return (data?.results ?? []).map(toSearchResult);
+}
+
+/** Quantos dias para trás contam como "lançamento recente". */
+const RECENT_RELEASE_DAYS = 180;
+/** Mínimo de votos para a nota do TMDB significar algo. */
+const RECENT_RELEASE_MIN_VOTES = "100";
+/** Notícias, reality, novelas e talk shows ficam de fora das sugestões. */
+const RECENT_RELEASE_EXCLUDED_GENRES = "10763,10764,10766,10767";
+
+/**
+ * Séries que estrearam nos últimos meses, da maior para a menor nota no TMDB.
+ * Paginado como o TMDB (20 por página).
+ */
+export async function getTMDBRecentReleases(
+  page = 1
+): Promise<{ results: ShowSearchResult[]; totalPages: number }> {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - RECENT_RELEASE_DAYS);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const data = await fetchTMDB<TMDBPaged<TMDBShowListItem>>("/discover/tv", {
+    "first_air_date.gte": iso(from),
+    "first_air_date.lte": iso(today),
+    "vote_count.gte": RECENT_RELEASE_MIN_VOTES,
+    without_genres: RECENT_RELEASE_EXCLUDED_GENRES,
+    sort_by: "vote_average.desc",
+    include_adult: "false",
+    page: String(page),
+  });
+  return { results: (data?.results ?? []).map(toSearchResult), totalPages: data?.total_pages ?? 0 };
 }
 
 /** Temporada com todos os episódios. Os IDs usam o ID do TMDB como showId. */

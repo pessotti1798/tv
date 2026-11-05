@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Episode, SeriesExtras, TrackedShow } from "@/types";
+import { Episode, SeriesExtras, Show, TrackedShow } from "@/types";
 import {
   buildPlaceholderEpisode,
   daysBetween,
@@ -14,6 +14,7 @@ import {
   getSeasonNumbers,
   releaseStatus,
   toISODate,
+  trackShow,
 } from "@/lib/episodes";
 import { useEpisodic } from "@/components/EpisodicProvider";
 import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, LeftAlign, leftItems, leftText, pageGrid, statusClass, withAlign } from "./styles";
@@ -47,6 +48,33 @@ function useSeasonEpisodes(show: TrackedShow | undefined) {
   }, [show?.id, seasonKey]);
 
   return seasons;
+}
+
+/**
+ * Série que não está na sua lista (ex.: vinda de "lançamentos"), buscada no TMDB
+ * pelo ID. `undefined` = carregando ou não se aplica; `null` = não encontrada.
+ */
+function usePreviewShow(id: string, enabled: boolean) {
+  const [result, setResult] = useState<{ id: string; show: Show | null } | null>(null);
+  const isTmdbId = /^\d+$/.test(id);
+
+  useEffect(() => {
+    if (!enabled || !isTmdbId) return;
+    let cancelled = false;
+    fetch(`/api/tmdb/show/${id}`)
+      .then(async (res) => (res.ok ? ((await res.json()).show as Show) : null))
+      .catch(() => null)
+      .then((show) => {
+        if (!cancelled) setResult({ id, show });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, enabled, isTmdbId]);
+
+  if (!enabled) return undefined;
+  if (!isTmdbId) return null;
+  return result?.id === id ? result.show : undefined;
 }
 
 /** Notas externas e onde assistir. `undefined` = carregando; `null` = indisponível. */
@@ -115,19 +143,35 @@ function Label({ children, align }: { children: React.ReactNode; align: LeftAlig
 
 export default function SeriesPage({ id }: { id: string }) {
   const router = useRouter();
-  const { trackedShows, watchedEpisodes, handleToggleWatch, handleUnwatch, handleMarkSeasonWatched, handleRemoveShow } =
-    useEpisodic();
+  const {
+    trackedShows,
+    watchedEpisodes,
+    handleToggleWatch,
+    handleUnwatch,
+    handleMarkSeasonWatched,
+    handleRemoveShow,
+    handleAddShow,
+  } = useEpisodic();
   const { offerUndo, undoElement } = useUndo();
-  const show = trackedShows.find((s) => s.id === id);
+  const tracked = trackedShows.find((s) => s.id === id);
+  // Fora da sua lista: a mesma página, só para consulta, com "+adicionar".
+  const preview = usePreviewShow(id, !tracked);
+  const previewView = useMemo(() => (preview ? trackShow(preview, {}, {}) : undefined), [preview]);
+  const show = tracked ?? previewView;
+  const inList = !!tracked;
   const [today] = useState(() => toISODate(new Date()));
   const seasons = useSeasonEpisodes(show);
   const extras = useExtras(show?.tmdbId);
   const align = useLeftAlign();
 
+  if (!show && preview === undefined) {
+    return <main className={`min-h-screen bg-white flex items-center justify-center px-4 ${DETAIL_TEXT} ${GRAY}`}>carregando…</main>;
+  }
+
   if (!show) {
     return (
       <main className={`min-h-screen bg-white flex flex-col items-center justify-center gap-4 px-4 ${DETAIL_TEXT}`}>
-        <p>Série não encontrada na sua lista.</p>
+        <p>Série não encontrada.</p>
         <Link href="/" className={`${GRAY} hover:text-black`}>
           ← voltar
         </Link>
@@ -174,7 +218,8 @@ export default function SeriesPage({ id }: { id: string }) {
     <main className="min-h-screen bg-white text-black px-4 py-12 sm:py-20">
       <div className="max-w-7xl mx-auto">
         <div className={`${pageGrid(align)} ${DETAIL_TEXT}`}>
-          <Link href={withAlign("/", align)} className={`${GRAY} hover:text-black ${leftText(align)}`}>
+          {/* Séries fora da sua lista só chegam aqui por "lançamentos". */}
+          <Link href={withAlign(inList ? "/" : "/lancamentos", align)} className={`${GRAY} hover:text-black ${leftText(align)}`}>
             ← voltar
           </Link>
           <span />
@@ -194,6 +239,16 @@ export default function SeriesPage({ id }: { id: string }) {
                 .filter(Boolean)
                 .join(" · ")}
             </p>
+            {!inList && (
+              <button
+                type="button"
+                // Ao adicionar, a série entra na sua lista com o mesmo ID e a página vira a normal.
+                onClick={() => preview && handleAddShow(preview)}
+                className={`${LIGHT_GRAY} self-start text-left hover:text-black transition-colors cursor-pointer mt-[0.3em]`}
+              >
+                +adicionar
+              </button>
+            )}
           </div>
         </div>
 
@@ -244,8 +299,12 @@ export default function SeriesPage({ id }: { id: string }) {
             )}
           </p>
 
-          <Label align={align}>progresso</Label>
-          <p className={DETAIL_VALUE}>{show.progressText}</p>
+          {inList && (
+            <>
+              <Label align={align}>progresso</Label>
+              <p className={DETAIL_VALUE}>{show.progressText}</p>
+            </>
+          )}
         </div>
 
         {/* Episódios */}
@@ -266,9 +325,10 @@ export default function SeriesPage({ id }: { id: string }) {
               <div key={n} className="contents">
                 {episodes.map((ep, idx) => {
                   const status = releaseStatus(ep, today);
-                  const isWatched = !!watchedEpisodes[ep.id];
-                  const isNext = !show.completed && show.currentEpisode.id === ep.id;
-                  const canToggle = status === "this-week" || status === "aired";
+                  const isWatched = inList && !!watchedEpisodes[ep.id];
+                  const isNext = inList && !show.completed && show.currentEpisode.id === ep.id;
+                  // Só dá para marcar episódios de séries que estão na sua lista.
+                  const canToggle = inList && (status === "this-week" || status === "aired");
                   return (
                     <div key={ep.id} className="contents group">
                       {/* Coluna esquerda: nome da temporada na 1ª linha, ação de marcar na 2ª. */}
@@ -277,16 +337,18 @@ export default function SeriesPage({ id }: { id: string }) {
                           <>
                             <span className={GRAY}>Temporada {n}</span>
                             {/* Celular: a ação fica ao lado do nome, para não cair entre episódios. */}
-                            <button
-                              type="button"
-                              onClick={() => handleMarkSeasonWatched(show.id, n)}
-                              className={`${LIGHT_GRAY} text-[0.8em] hover:text-black cursor-pointer ml-3 min-[480px]:hidden`}
-                            >
-                              marcar como vista
-                            </button>
+                            {inList && (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkSeasonWatched(show.id, n)}
+                                className={`${LIGHT_GRAY} text-[0.8em] hover:text-black cursor-pointer ml-3 min-[480px]:hidden`}
+                              >
+                                marcar como vista
+                              </button>
+                            )}
                           </>
                         )}
-                        {idx === 1 && (
+                        {idx === 1 && inList && (
                           <button
                             type="button"
                             onClick={() => handleMarkSeasonWatched(show.id, n)}
@@ -321,12 +383,14 @@ export default function SeriesPage({ id }: { id: string }) {
         </div>
 
         {/* Remover */}
+        {inList && (
         <div className={`${pageGrid(align)} ${DETAIL_TEXT} mt-[clamp(2.5rem,6vw,5rem)]`}>
           <button type="button" onClick={remove} className={`${LIGHT_GRAY} ${leftText(align)} hover:text-black cursor-pointer`}>
             remover série
           </button>
           <span />
         </div>
+        )}
       </div>
       {undoElement}
     </main>
