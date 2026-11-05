@@ -15,18 +15,13 @@ import {
 import { STORAGE_KEYS, getFromStorage, saveToStorage, migrateLegacyData } from "@/lib/storage";
 import {
   DEFAULT_RUNTIME,
-  EpisodeRef,
   fetchEpisode,
-  getAllEpisodeIds,
-  getLastEpisodeRef,
-  getPrevEpisodeRef,
   fetchShowMetadata,
   getSeasonEpisodeIds,
   hasAired,
   isPlaceholderEpisode,
   mergeShowStructure,
   needsSync,
-  makeEpisodeId,
   parseEpisodeId,
   toISODate,
   trackShow,
@@ -251,31 +246,6 @@ function useEpisodicState() {
     dropUnreviewedLogs(episode.id);
   };
 
-  // Desfaz o último episódio visto: ele volta a ser o próximo.
-  const handleRewindEpisode = (showId: string) => {
-    const show = trackedShows.find((s) => s.id === showId);
-    if (!show) return;
-
-    const current: EpisodeRef = { season: show.currentEpisode.seasonNumber, episode: show.currentEpisode.episodeNumber };
-    const prev = show.completed ? getLastEpisodeRef(show) : getPrevEpisodeRef(show, current);
-    if (!prev) return;
-
-    const prevId = makeEpisodeId(show.id, prev.season, prev.episode);
-    setWatchedEpisodes((w) => {
-      const next = { ...w };
-      delete next[prevId];
-      return next;
-    });
-    dropUnreviewedLogs(prevId);
-    updateShow(showId, { focusEpisodeId: prevId });
-  };
-
-  // "Focar no Radar": define a partir de qual episódio seguir.
-  const handleSetCurrentEpisode = (showId: string, episode: Episode) => {
-    rememberEpisode(episode);
-    updateShow(showId, { focusEpisodeId: episode.id });
-  };
-
   // Mark Entire Season as Watched
   const handleMarkSeasonWatched = (showId: string, seasonNum: number) => {
     const show = shows.find((s) => s.id === showId);
@@ -299,120 +269,9 @@ function useEpisodicState() {
     setDiaryLogs((logs) => [entry, ...logs]);
   };
 
-  // Mark Entire Show as Watched
-  const handleMarkShowWatched = (showId: string) => {
-    const show = shows.find((s) => s.id === showId);
-    if (!show) return;
-
-    setWatchedEpisodes((prev) => {
-      const next = { ...prev };
-      getAllEpisodeIds(show).forEach((id) => (next[id] = true));
-      return next;
-    });
-    updateShow(showId, { focusEpisodeId: undefined });
-
-    const entry = makeBulkDiaryEntry(
-      show,
-      "full",
-      "COMPLETA",
-      `Todos os ${show.totalEpisodes} episódios`,
-      "Série completa assistida e arquivada com sucesso."
-    );
-    setDiaryLogs((logs) => [entry, ...logs]);
-  };
-
   // Remove Show
   const handleRemoveShow = (showId: string) => {
     setShows((prev) => prev.filter((s) => s.id !== showId));
-  };
-
-  // Rating Change (0 remove a nota)
-  const handleSetRating = (episode: Episode, rating: number) => {
-    const id = episode.id;
-    setUserRatings((prev) => {
-      const next = { ...prev };
-      if (rating > 0) next[id] = rating;
-      else delete next[id];
-      return next;
-    });
-    // A nota vale para o registro mais recente do episódio (rewatches anteriores mantêm a sua).
-    setDiaryLogs((prev) => {
-      const latest = prev.findIndex((l) => l.episodeId === id);
-      return prev.map((l, i) => (i === latest ? { ...l, rating: rating > 0 ? rating : undefined } : l));
-    });
-  };
-
-  // Add Review
-  const handleAddReview = (episode: Episode, content: string, hasSpoilers: boolean, log: DiaryLogOptions) => {
-
-    const newReview: Review = {
-      id: `rev-${Date.now()}`,
-      episodeId: episode.id,
-      userName: profile.name,
-      userAvatar: profile.avatarUrl,
-      userHandle: profile.handle,
-      rating: userRatings[episode.id] || 0,
-      content,
-      hasSpoilers,
-      createdAt: "Agora",
-      likesCount: 0,
-    };
-
-    setReviewsMap((prev) => ({
-      ...prev,
-      [episode.id]: [newReview, ...(prev[episode.id] || [])],
-    }));
-
-    // Resenha implica ter assistido. O registro no diário é feito abaixo.
-    if (!watchedEpisodes[episode.id]) {
-      handleToggleWatch(episode, { ...log, save: false });
-    }
-
-    if (log.save) {
-      const show = shows.find((s) => s.id === episode.showId);
-      setDiaryLogs((prev) => {
-        // Se já existe um registro do mesmo dia sem resenha, a resenha entra nele.
-        const idx = prev.findIndex(
-          (l) =>
-            l.episodeId === episode.id &&
-            l.watchedAt === log.date &&
-            !!l.isRewatch === log.isRewatch &&
-            !l.reviewText?.trim()
-        );
-        if (idx >= 0) {
-          return prev.map((l, i) => (i === idx ? { ...l, reviewText: content, hasSpoilers } : l));
-        }
-        const entry = makeDiaryEntry(show, episode, {
-          watchedAt: log.date,
-          isRewatch: log.isRewatch,
-          reviewText: content,
-          hasSpoilers,
-        });
-        return [entry, ...prev];
-      });
-    }
-  };
-
-  // Registra mais uma sessão de um episódio já visto (rewatch), sem mexer no progresso.
-  const handleLogWatch = (episode: Episode, log: DiaryLogOptions) => {
-    const show = shows.find((s) => s.id === episode.showId);
-    const entry = makeDiaryEntry(show, episode, { watchedAt: log.date, isRewatch: log.isRewatch });
-    setDiaryLogs((prev) => [entry, ...prev]);
-  };
-
-  // Like / unlike Review
-  const handleLikeReview = (reviewId: string) => {
-    setReviewsMap((prev) => {
-      const updated: Record<string, Review[]> = {};
-      Object.entries(prev).forEach(([epId, list]) => {
-        updated[epId] = list.map((r) =>
-          r.id === reviewId
-            ? { ...r, userLiked: !r.userLiked, likesCount: Math.max(0, r.likesCount + (r.userLiked ? -1 : 1)) }
-            : r
-        );
-      });
-      return updated;
-    });
   };
 
   // Add Show from Search Modal
@@ -469,16 +328,6 @@ function useEpisodicState() {
     setUserLists((prev) => prev.map((l) => (l.id === listId ? { ...l, ...patch } : l)));
   };
 
-  const handleToggleLikeList = (listId: string) => {
-    setUserLists((prev) =>
-      prev.map((l) =>
-        l.id === listId
-          ? { ...l, userLiked: !l.userLiked, likesCount: l.likesCount + (l.userLiked ? -1 : 1) }
-          : l
-      )
-    );
-  };
-
   const currentProfile: UserProfile = {
     ...profile,
     totalMinutesWatched: dynamicStats.totalMinutesWatched,
@@ -486,37 +335,23 @@ function useEpisodicState() {
     totalShowsCompleted: dynamicStats.totalShowsCompleted,
   };
 
-  const totalReviewsCount = Object.values(reviewsMap).flat().length;
   const existingShowIds = shows.flatMap((s) => (s.tmdbId ? [s.id, String(s.tmdbId)] : [s.id]));
 
   return {
     shows,
     trackedShows,
     watchedEpisodes,
-    userRatings,
-    reviewsMap,
     diaryLogs,
     userLists,
     profile,
     setProfile,
-    episodeCache,
-    dynamicStats,
     currentProfile,
-    totalReviewsCount,
     existingShowIds,
     reloadDataFromStorage,
-    rememberEpisode,
     handleToggleWatch,
     handleUnwatch,
-    handleRewindEpisode,
-    handleSetCurrentEpisode,
     handleMarkSeasonWatched,
-    handleMarkShowWatched,
     handleRemoveShow,
-    handleSetRating,
-    handleAddReview,
-    handleLogWatch,
-    handleLikeReview,
     handleAddShow,
     handleDeleteLog,
     handleUpdateLog,
@@ -524,7 +359,6 @@ function useEpisodicState() {
     handleCreateList,
     handleUpdateList,
     handleDeleteList,
-    handleToggleLikeList,
   };
 }
 
@@ -533,8 +367,7 @@ export type EpisodicState = ReturnType<typeof useEpisodicState>;
 const EpisodicContext = createContext<EpisodicState | null>(null);
 
 /**
- * Estado compartilhado por todas as páginas (lista inicial, página da série e
- * interface clássica). Montado só no cliente (ver components/ClientRoot.tsx),
+ * Estado compartilhado por todas as páginas. Montado só no cliente (ver components/ClientRoot.tsx),
  * então o estado inicial vem direto do localStorage.
  */
 export function EpisodicProvider({ children }: { children: React.ReactNode }) {

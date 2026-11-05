@@ -63,16 +63,6 @@ export function getNextEpisodeRef(show: Show, ref: EpisodeRef): EpisodeRef | nul
   return nextSeason !== undefined ? { season: nextSeason, episode: 1 } : null;
 }
 
-export function getPrevEpisodeRef(show: Show, ref: EpisodeRef): EpisodeRef | null {
-  if (ref.episode > 1) return { season: ref.season, episode: ref.episode - 1 };
-  const prevSeason = getSeasonNumbers(show)
-    .filter((n) => n < ref.season && getSeasonEpisodeCount(show, n) > 0)
-    .pop();
-  return prevSeason !== undefined
-    ? { season: prevSeason, episode: getSeasonEpisodeCount(show, prevSeason) }
-    : null;
-}
-
 export function getLastEpisodeRef(show: Show): EpisodeRef | null {
   const lastSeason = getSeasonNumbers(show)
     .filter((n) => getSeasonEpisodeCount(show, n) > 0)

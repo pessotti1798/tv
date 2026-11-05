@@ -170,11 +170,6 @@ export async function searchTMDBShows(query: string): Promise<ShowSearchResult[]
   return (data?.results ?? []).map(toSearchResult);
 }
 
-export async function getTMDBTrendingShows(): Promise<ShowSearchResult[]> {
-  const data = await fetchTMDB<TMDBPaged<TMDBShowListItem>>("/trending/tv/week");
-  return (data?.results ?? []).slice(0, 10).map(toSearchResult);
-}
-
 /** Temporada com todos os episódios. Os IDs usam o ID do TMDB como showId. */
 export async function getTMDBSeasonDetails(tmdbId: number | string, seasonNumber: number): Promise<SeasonInfo | null> {
   const seasonData = await fetchTMDB<TMDBSeason>(`/tv/${tmdbId}/season/${seasonNumber}`);
