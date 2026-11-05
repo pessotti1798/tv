@@ -1,33 +1,84 @@
-import { Show, Episode, SeasonInfo } from "@/types";
+import { Show, Episode, SeasonInfo, ShowSearchResult } from "@/types";
+import { episodeCode, makeEpisodeId } from "./episodes";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500&auto=format&fit=crop&q=80";
+const DEFAULT_RUNTIME = 50;
+
+// ---------------------------------------------------------------------------
+// Formato das respostas do TMDB (apenas os campos usados aqui)
+// ---------------------------------------------------------------------------
+
+interface TMDBShowListItem {
+  id: number;
+  name?: string;
+  original_name?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  overview?: string;
+  vote_average?: number;
+}
+
+interface TMDBEpisode {
+  episode_number: number;
+  season_number: number;
+  name?: string;
+  runtime?: number | null;
+  air_date?: string | null;
+  overview?: string;
+  still_path?: string | null;
+  vote_average?: number;
+  crew?: { job?: string; name: string }[];
+  guest_stars?: { name: string }[];
+}
+
+interface TMDBSeason {
+  name?: string;
+  overview?: string;
+  poster_path?: string | null;
+  air_date?: string | null;
+  episodes?: TMDBEpisode[];
+}
+
+interface TMDBSeasonSummary {
+  season_number: number;
+  name?: string;
+  episode_count?: number;
+  overview?: string;
+  poster_path?: string | null;
+  air_date?: string | null;
+}
+
+interface TMDBShowDetails extends TMDBShowListItem {
+  name: string;
+  status?: string;
+  networks?: { name: string }[];
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  seasons?: TMDBSeasonSummary[];
+  next_episode_to_air?: TMDBEpisode | null;
+  last_episode_to_air?: TMDBEpisode | null;
+}
+
+interface TMDBPaged<T> {
+  results?: T[];
+}
+
+// ---------------------------------------------------------------------------
+// Cliente
+// ---------------------------------------------------------------------------
 
 export function getTMDBImageUrl(path: string | null | undefined, size: "w300" | "w500" | "w1280" | "original" = "w500"): string {
-  if (!path) return "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500&auto=format&fit=crop&q=80";
+  if (!path) return FALLBACK_IMAGE;
   if (path.startsWith("http")) return path;
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
 }
 
-function getApiKey(): string | null {
-  return process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY || null;
-}
-
-function getHeaders(): HeadersInit {
-  const token = process.env.TMDB_ACCESS_TOKEN;
-  if (token) {
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-  }
-  return {
-    "Content-Type": "application/json",
-  };
-}
-
 export async function fetchTMDB<T>(endpoint: string, params: Record<string, string> = {}): Promise<T | null> {
-  const apiKey = getApiKey();
+  const apiKey = process.env.TMDB_API_KEY;
   const token = process.env.TMDB_ACCESS_TOKEN;
 
   if (!apiKey && !token) {
@@ -36,17 +87,16 @@ export async function fetchTMDB<T>(endpoint: string, params: Record<string, stri
   }
 
   const query = new URLSearchParams(params);
-  if (apiKey && !token) {
-    query.set("api_key", apiKey);
-  }
+  if (apiKey && !token) query.set("api_key", apiKey);
   query.set("language", "pt-BR");
 
-  const url = `${TMDB_BASE_URL}${endpoint}?${query.toString()}`;
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const res = await fetch(url, {
-      headers: getHeaders(),
-      next: { revalidate: 3600 }, // cache for 1 hour in Next.js
+    const res = await fetch(`${TMDB_BASE_URL}${endpoint}?${query.toString()}`, {
+      headers,
+      next: { revalidate: 3600 }, // cache de 1 hora no Next.js
     });
 
     if (!res.ok) {
@@ -54,59 +104,86 @@ export async function fetchTMDB<T>(endpoint: string, params: Record<string, stri
       return null;
     }
 
-    return await res.json();
+    return (await res.json()) as T;
   } catch (err) {
     console.error("TMDB Fetch Error:", err);
     return null;
   }
 }
 
-// Search TV Shows
-export async function searchTMDBShows(query: string) {
-  if (!query.trim()) return [];
-  const data = await fetchTMDB<{ results: any[] }>("/search/tv", { query });
-  if (!data?.results) return [];
+// ---------------------------------------------------------------------------
+// Conversões TMDB -> modelo do app
+// ---------------------------------------------------------------------------
 
-  return data.results.map((item) => ({
+function yearOf(date?: string | null): string {
+  return date ? date.split("-")[0] : "—";
+}
+
+function roundRating(value?: number): number {
+  return value ? Number(value.toFixed(1)) : 0;
+}
+
+function toSearchResult(item: TMDBShowListItem): ShowSearchResult {
+  return {
     id: String(item.id),
     tmdbId: item.id,
-    title: item.name || item.original_name,
-    network: "TV",
-    firstAirYear: item.first_air_date ? item.first_air_date.split("-")[0] : "—",
+    title: item.name || item.original_name || "Sem título",
+    firstAirYear: yearOf(item.first_air_date),
     posterUrl: getTMDBImageUrl(item.poster_path, "w500"),
     backdropUrl: getTMDBImageUrl(item.backdrop_path, "w1280"),
     overview: item.overview || "Sem sinopse disponível em português.",
-    voteAverage: item.vote_average ? Number(item.vote_average.toFixed(1)) : 0,
-  }));
+    voteAverage: roundRating(item.vote_average),
+  };
 }
 
-// Get Season Details with all episodes
+function toEpisode(
+  ep: TMDBEpisode,
+  show: { id: string; title: string; network: string; backdropUrl?: string; runtime?: number }
+): Episode {
+  return {
+    id: makeEpisodeId(show.id, ep.season_number, ep.episode_number),
+    showId: show.id,
+    showTitle: show.title,
+    network: show.network,
+    seasonNumber: ep.season_number,
+    episodeNumber: ep.episode_number,
+    code: episodeCode(ep.season_number, ep.episode_number),
+    title: ep.name || `Episódio ${ep.episode_number}`,
+    runtime: ep.runtime || show.runtime || DEFAULT_RUNTIME,
+    airDate: ep.air_date || "—",
+    overview: ep.overview || "Sem sinopse disponível em português.",
+    stillUrl: getTMDBImageUrl(ep.still_path ?? null, "w500"),
+    backdropUrl: ep.still_path ? getTMDBImageUrl(ep.still_path, "w1280") : show.backdropUrl || FALLBACK_IMAGE,
+    averageRating: roundRating(ep.vote_average),
+    director: ep.crew?.find((c) => c.job === "Director")?.name,
+    guestStars: (ep.guest_stars || []).slice(0, 4).map((g) => g.name),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Consultas
+// ---------------------------------------------------------------------------
+
+export async function searchTMDBShows(query: string): Promise<ShowSearchResult[]> {
+  if (!query.trim()) return [];
+  const data = await fetchTMDB<TMDBPaged<TMDBShowListItem>>("/search/tv", { query });
+  return (data?.results ?? []).map(toSearchResult);
+}
+
+export async function getTMDBTrendingShows(): Promise<ShowSearchResult[]> {
+  const data = await fetchTMDB<TMDBPaged<TMDBShowListItem>>("/trending/tv/week");
+  return (data?.results ?? []).slice(0, 10).map(toSearchResult);
+}
+
+/** Temporada com todos os episódios. Os IDs usam o ID do TMDB como showId. */
 export async function getTMDBSeasonDetails(tmdbId: number | string, seasonNumber: number): Promise<SeasonInfo | null> {
-  const seasonData = await fetchTMDB<any>(`/tv/${tmdbId}/season/${seasonNumber}`);
+  const seasonData = await fetchTMDB<TMDBSeason>(`/tv/${tmdbId}/season/${seasonNumber}`);
   if (!seasonData) return null;
 
-  const episodes: Episode[] = (seasonData.episodes || []).map((ep: any) => {
-    const sCode = seasonNumber < 10 ? `0${seasonNumber}` : `${seasonNumber}`;
-    const eCode = ep.episode_number < 10 ? `0${ep.episode_number}` : `${ep.episode_number}`;
-    return {
-      id: `${tmdbId}-${seasonNumber}-${ep.episode_number}`,
-      showId: String(tmdbId),
-      showTitle: "",
-      network: "",
-      seasonNumber,
-      episodeNumber: ep.episode_number,
-      code: `S${sCode}E${eCode}`,
-      title: ep.name || `Episódio ${ep.episode_number}`,
-      runtime: ep.runtime || 50,
-      airDate: ep.air_date || "—",
-      overview: ep.overview || "Sem sinopse disponível em português.",
-      stillUrl: getTMDBImageUrl(ep.still_path, "w500"),
-      backdropUrl: getTMDBImageUrl(ep.still_path, "w1280"),
-      averageRating: ep.vote_average ? Number(ep.vote_average.toFixed(1)) : 8.0,
-      director: ep.crew?.find((c: any) => c.job === "Director")?.name,
-      guestStars: (ep.guest_stars || []).slice(0, 4).map((g: any) => g.name),
-    };
-  });
+  const showRef = { id: String(tmdbId), title: "", network: "" };
+  const episodes = (seasonData.episodes || []).map((ep) =>
+    toEpisode({ ...ep, season_number: ep.season_number ?? seasonNumber }, showRef)
+  );
 
   return {
     seasonNumber,
@@ -119,38 +196,19 @@ export async function getTMDBSeasonDetails(tmdbId: number | string, seasonNumber
   };
 }
 
-// Get TV Show Details with Seasons & Episodes
+/** Série completa, pronta para entrar no Radar a partir do S01E01. */
 export async function getTMDBShowFullDetails(tmdbId: number | string): Promise<Show | null> {
-  const showData = await fetchTMDB<any>(`/tv/${tmdbId}`);
+  const showData = await fetchTMDB<TMDBShowDetails>(`/tv/${tmdbId}`);
   if (!showData) return null;
 
-  // Fetch Season 1 details by default to get the first episode
-  const seasonNum = 1;
-  const seasonData = await fetchTMDB<any>(`/tv/${tmdbId}/season/${seasonNum}`);
-  
-  const networkName = showData.networks?.[0]?.name || "Streaming";
-  const firstEpisode = seasonData?.episodes?.[0];
-
-  const currentEpisode: Episode = {
-    id: `${tmdbId}-1-${firstEpisode?.episode_number || 1}`,
-    showId: String(tmdbId),
-    showTitle: showData.name,
-    network: networkName,
-    seasonNumber: seasonNum,
-    episodeNumber: firstEpisode?.episode_number || 1,
-    code: `S01E0${firstEpisode?.episode_number || 1}`,
-    title: firstEpisode?.name || "Episódio 1",
-    runtime: firstEpisode?.runtime || showData.episode_run_time?.[0] || 50,
-    airDate: firstEpisode?.air_date || showData.first_air_date || "—",
-    overview: firstEpisode?.overview || showData.overview || "Sem sinopse.",
-    stillUrl: getTMDBImageUrl(firstEpisode?.still_path, "w500"),
-    backdropUrl: getTMDBImageUrl(showData.backdrop_path, "w1280"),
-    averageRating: firstEpisode?.vote_average ? Number(firstEpisode.vote_average.toFixed(1)) : 8.5,
-  };
+  const id = String(showData.id);
+  const network = showData.networks?.[0]?.name || "Streaming";
+  const backdropUrl = getTMDBImageUrl(showData.backdrop_path, "w1280");
+  const runtime = showData.episode_run_time?.[0];
 
   const seasons: SeasonInfo[] = (showData.seasons || [])
-    .filter((s: any) => s.season_number > 0)
-    .map((s: any) => ({
+    .filter((s) => s.season_number > 0)
+    .map((s) => ({
       seasonNumber: s.season_number,
       name: s.name || `Temporada ${s.season_number}`,
       episodeCount: s.episode_count || 0,
@@ -159,57 +217,40 @@ export async function getTMDBShowFullDetails(tmdbId: number | string): Promise<S
       airDate: s.air_date || "",
     }));
 
+  const firstSeason = seasons[0]?.seasonNumber ?? 1;
+  const seasonData = await fetchTMDB<TMDBSeason>(`/tv/${tmdbId}/season/${firstSeason}`);
+  const firstEpisode: TMDBEpisode = seasonData?.episodes?.[0] ?? { season_number: firstSeason, episode_number: 1 };
+
+  const currentEpisode = toEpisode(
+    { ...firstEpisode, season_number: firstEpisode.season_number ?? firstSeason },
+    { id, title: showData.name, network, backdropUrl, runtime }
+  );
+  // Sem imagem própria do episódio, usa o backdrop da série.
+  if (!firstEpisode.still_path) currentEpisode.backdropUrl = backdropUrl;
+
+  const totalEpisodes = showData.number_of_episodes || seasons.reduce((sum, s) => sum + s.episodeCount, 0);
+
   return {
-    id: String(showData.id),
+    id,
     tmdbId: showData.id,
     title: showData.name,
-    network: networkName,
-    firstAirYear: showData.first_air_date ? showData.first_air_date.split("-")[0] : "—",
+    network,
+    firstAirYear: yearOf(showData.first_air_date),
     posterUrl: getTMDBImageUrl(showData.poster_path, "w500"),
-    backdropUrl: getTMDBImageUrl(showData.backdrop_path, "w1280"),
+    backdropUrl,
     overview: showData.overview || "Sem sinopse.",
-    totalSeasons: showData.number_of_seasons || 1,
-    totalEpisodes: showData.number_of_episodes || 10,
+    totalSeasons: showData.number_of_seasons || seasons.length || 1,
+    totalEpisodes,
     currentEpisode,
-    progressText: `1 de ${showData.number_of_episodes || 10} episódios (0%)`,
+    progressText: `0 de ${totalEpisodes} episódios (0%)`,
     progressPercent: 0,
     seasons,
   };
 }
 
-// Get Trending Shows
-export async function getTMDBTrendingShows() {
-  const data = await fetchTMDB<{ results: any[] }>("/trending/tv/week");
-  if (!data?.results) return [];
-
-  return data.results.slice(0, 10).map((item) => ({
-    id: String(item.id),
-    tmdbId: item.id,
-    title: item.name,
-    firstAirYear: item.first_air_date ? item.first_air_date.split("-")[0] : "—",
-    posterUrl: getTMDBImageUrl(item.poster_path, "w500"),
-    backdropUrl: getTMDBImageUrl(item.backdrop_path, "w1280"),
-    overview: item.overview,
-    voteAverage: item.vote_average ? Number(item.vote_average.toFixed(1)) : 0,
-  }));
-}
-
-
 // ---------------------------------------------------------------------------
 // Agenda de transmissão (calendário)
 // ---------------------------------------------------------------------------
-
-interface TMDBEpisodeStub {
-  season_number: number;
-  episode_number: number;
-  air_date: string | null;
-}
-
-interface TMDBShowSchedule {
-  status?: string;
-  next_episode_to_air?: TMDBEpisodeStub | null;
-  last_episode_to_air?: TMDBEpisodeStub | null;
-}
 
 export interface AirSchedule {
   /** Status da série no TMDB, ex.: "Returning Series", "Ended". */
@@ -225,7 +266,7 @@ export interface AirSchedule {
  * vindos das temporadas do último e do próximo episódio anunciados.
  */
 export async function getTMDBAirSchedule(tmdbId: number | string, since: string): Promise<AirSchedule | null> {
-  const show = await fetchTMDB<TMDBShowSchedule>(`/tv/${tmdbId}`);
+  const show = await fetchTMDB<TMDBShowDetails>(`/tv/${tmdbId}`);
   if (!show) return null;
 
   const seasonNumbers = new Set<number>();

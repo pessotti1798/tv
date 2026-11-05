@@ -113,8 +113,25 @@ function migrateKeys<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(Object.entries(record).map(([k, v]) => [migrateId(k), v]));
 }
 
+/** Imagens do demo antigo que não existem mais no Unsplash (404) -> substitutas. */
+const BROKEN_IMAGE_IDS: [string, string][] = [
+  ["photo-1528164344705-475647b2a1e5", "photo-1493976040374-85c8e12f0c0e"],
+  ["photo-1579783902614-a3fb3927b675", "photo-1563089145-599997674d42"],
+];
+
+function fixBrokenImageUrls(): void {
+  for (const key of Object.values(STORAGE_KEYS)) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    let fixed = raw;
+    for (const [from, to] of BROKEN_IMAGE_IDS) fixed = fixed.split(from).join(to);
+    if (fixed !== raw) localStorage.setItem(key, fixed);
+  }
+}
+
 export function migrateLegacyData(): void {
   if (typeof window === "undefined") return;
+  fixBrokenImageUrls();
   const watched = getFromStorage<Record<string, boolean> | null>(STORAGE_KEYS.WATCHED, null);
   if (watched) saveToStorage(STORAGE_KEYS.WATCHED, migrateKeys(watched));
   const ratings = getFromStorage<Record<string, number> | null>(STORAGE_KEYS.RATINGS, null);

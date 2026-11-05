@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { Show, Episode } from "@/types";
-import { Check, ArrowRight, Plus, MoreVertical, CheckCheck, Trash2, Sparkles, Layers, RotateCcw } from "lucide-react";
+import { Check, Plus, MoreVertical, CheckCheck, Trash2, Sparkles, Layers, RotateCcw } from "lucide-react";
 
 interface UpNextSectionProps {
   shows: Show[];
-  watchedEpisodes: Record<string, boolean>;
   onSelectEpisode: (episode: Episode) => void;
   onToggleWatch: (episode: Episode) => void;
   onMarkSeasonWatched: (showId: string, seasonNum: number) => void;
@@ -19,7 +19,6 @@ interface UpNextSectionProps {
 
 export const UpNextSection: React.FC<UpNextSectionProps> = ({
   shows,
-  watchedEpisodes,
   onSelectEpisode,
   onToggleWatch,
   onMarkSeasonWatched,
@@ -121,7 +120,6 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {sortedActiveShows.map((show) => {
               const ep = show.currentEpisode;
-              const isWatched = !!watchedEpisodes[ep.id];
               const isMenuOpen = openMenuShowId === show.id;
 
               return (
@@ -135,7 +133,7 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
                       className="relative h-40 overflow-hidden cursor-pointer"
                       onClick={() => onSelectEpisode(ep)}
                     >
-                      <img
+                      <Image fill sizes="(max-width: 768px) 100vw, 33vw"
                         src={ep.stillUrl || show.backdropUrl}
                         alt={show.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -319,7 +317,7 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
                 className="group relative bg-[#1b2228] border border-[#2c3642] hover:border-[#384656] rounded-xl overflow-hidden shadow-sm cursor-pointer"
               >
                 <div className="relative h-48 sm:h-56">
-                  <img
+                  <Image fill sizes="(max-width: 768px) 50vw, 20vw"
                     src={show.posterUrl}
                     alt={show.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100"

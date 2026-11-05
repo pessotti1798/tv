@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Show, Episode, SeasonInfo } from "@/types";
 import { buildPlaceholderEpisode, fetchSeason, getSeasonEpisodeCount, getSeasonNumbers } from "@/lib/episodes";
-import { X, Check, CheckCheck, Play, Star, Calendar, Clock, Film, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { X, Check, CheckCheck, Loader2 } from "lucide-react";
 
 interface ShowDetailsModalProps {
   show: Show | null;
@@ -86,7 +87,7 @@ export const ShowDetailsModal: React.FC<ShowDetailsModalProps> = ({
         
         {/* Header Hero */}
         <div className="relative h-60 sm:h-72 w-full overflow-hidden shrink-0">
-          <img
+          <Image fill sizes="(max-width: 896px) 100vw, 896px"
             src={show.backdropUrl || show.posterUrl}
             alt={show.title}
             className="w-full h-full object-cover object-center"
@@ -201,7 +202,7 @@ export const ShowDetailsModal: React.FC<ShowDetailsModalProps> = ({
                           onClick={() => setExpandedEpisodeId(isExpanded ? null : ep.id)}
                         >
                           <div className="relative w-16 h-10 rounded-md overflow-hidden bg-[#242f38] shrink-0">
-                            <img
+                            <Image fill sizes="64px"
                               src={ep.stillUrl || show.posterUrl}
                               alt={ep.title}
                               className="w-full h-full object-cover"

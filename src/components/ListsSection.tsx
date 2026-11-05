@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { UserList, Show, ListItem } from "@/types";
-import { Plus, Heart, X, Trash2, Layers, Film } from "lucide-react";
+import { Plus, Heart, X, Trash2, Layers } from "lucide-react";
 
 interface ListsSectionProps {
   lists: UserList[];
@@ -111,7 +112,7 @@ export const ListsSection: React.FC<ListsSectionProps> = ({
                   </div>
                 ) : (
                   list.items.slice(0, 5).map((item, idx) => (
-                    <img
+                    <Image width={80} height={112}
                       key={item.id || idx}
                       className="inline-block h-28 w-20 object-cover rounded-lg ring-2 ring-[#1b2228] shadow-md group-hover:translate-y-[-2px] transition-transform"
                       src={item.posterUrl}
@@ -183,7 +184,7 @@ export const ListsSection: React.FC<ListsSectionProps> = ({
                     <span className="text-xs font-mono font-bold text-[#687684] w-4 text-center">
                       {idx + 1}
                     </span>
-                    <img
+                    <Image width={48} height={64}
                       src={item.posterUrl}
                       alt={item.title}
                       className="w-12 h-16 object-cover rounded-md bg-[#242f38] shrink-0"
@@ -288,7 +289,7 @@ export const ListsSection: React.FC<ListsSectionProps> = ({
                             }`}
                           >
                             <div className="flex items-center gap-2">
-                              <img src={show.posterUrl} alt={show.title} className="w-8 h-10 object-cover rounded" />
+                              <Image width={32} height={40} src={show.posterUrl} alt={show.title} className="w-8 h-10 object-cover rounded" />
                               <span className="font-semibold text-white">{show.title}</span>
                             </div>
                             <input

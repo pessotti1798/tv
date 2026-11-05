@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { Episode, Review } from "@/types";
 import { Check, Star, X, MessageSquare, Heart, ShieldAlert, Users, Film } from "lucide-react";
 
@@ -62,7 +63,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
         
         {/* Modal Hero Header with Backdrop */}
         <div className="relative h-56 sm:h-64 w-full overflow-hidden shrink-0">
-          <img
+          <Image fill sizes="(max-width: 768px) 100vw, 768px"
             src={episode.backdropUrl || episode.stillUrl}
             alt={episode.title}
             className="w-full h-full object-cover object-center"
@@ -96,8 +97,12 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
                 <span>{episode.runtime} min</span>
                 <span>•</span>
                 <span>{episode.airDate}</span>
-                <span>•</span>
-                <span className="text-[#ffaa00]">Média: {episode.averageRating}/10</span>
+                {episode.averageRating > 0 && (
+                  <>
+                    <span>•</span>
+                    <span className="text-[#ffaa00]">Média: {episode.averageRating}/10</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -338,7 +343,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
-                              <img
+                              <Image width={24} height={24} unoptimized
                                 src={rev.userAvatar}
                                 alt={rev.userName}
                                 className="w-6 h-6 rounded-full object-cover"

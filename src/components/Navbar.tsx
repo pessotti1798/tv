@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { PlaySquare, Calendar, BookOpen, List, User, Search, Clock } from "lucide-react";
 
 interface NavbarProps {
@@ -135,7 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-[#1b2228] border border-transparent hover:border-[#2c3642] transition-colors cursor-pointer"
           >
             <span className="text-xs font-semibold text-white hidden md:inline">{userName}</span>
-            <img
+            <Image width={28} height={28} unoptimized
               src={userAvatar}
               alt="Avatar"
               className="w-7 h-7 rounded-full object-cover ring-1 ring-[#00e054]"

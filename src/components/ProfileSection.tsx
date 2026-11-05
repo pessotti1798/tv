@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { UserProfile, Show, WatchLog } from "@/types";
-import { Share2, Edit2, Download, Upload, RotateCcw, X, Check, Star } from "lucide-react";
+import { Edit2, Download, Upload, RotateCcw, X, Check } from "lucide-react";
 import { exportBackupData, importBackupData, resetToDemoData } from "@/lib/storage";
 
 interface ProfileSectionProps {
@@ -171,7 +172,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
       {/* Profile Header Card */}
       <div className="bg-[#1b2228] border border-[#2c3642] rounded-2xl p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <img
+          <Image width={96} height={96} unoptimized
             src={profile.avatarUrl}
             alt={profile.name}
             className="w-24 h-24 rounded-full object-cover ring-4 ring-[#00e054]/30 shrink-0"
@@ -274,7 +275,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 key={show.id}
                 className="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] hover:border-[#00e054] transition-all"
               >
-                <img
+                <Image width={300} height={450}
                   src={show.posterUrl}
                   alt={show.title}
                   className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300"
@@ -467,7 +468,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <img src={show.posterUrl} alt={show.title} className="w-10 h-14 object-cover rounded-md" />
+                      <Image width={40} height={56} src={show.posterUrl} alt={show.title} className="w-10 h-14 object-cover rounded-md" />
                       <div>
                         <h4 className="font-bold text-white">{show.title}</h4>
                         <span className="text-[11px] text-[#687684]">{show.network} • {show.firstAirYear}</span>

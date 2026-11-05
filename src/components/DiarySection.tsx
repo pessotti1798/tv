@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { WatchLog } from "@/types";
-import { Trash2, Search, Filter, BookOpen } from "lucide-react";
+import { Trash2, Search, BookOpen } from "lucide-react";
 
 interface DiarySectionProps {
   logs: WatchLog[];
@@ -17,7 +18,6 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
 }) => {
   const [filterType, setFilterType] = useState<"all" | "review" | "rewatch">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"recent" | "rating">("recent");
 
   const filteredLogs = useMemo(() => {
     let result = [...logs];
@@ -41,15 +41,8 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
       );
     }
 
-    // Sort
-    if (sortBy === "rating") {
-      result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    } else {
-      // Recent first (assuming default array order is latest first)
-    }
-
     return result;
-  }, [logs, filterType, searchQuery, sortBy]);
+  }, [logs, filterType, searchQuery]);
 
   return (
     <section className="space-y-6 animate-fadeIn">
@@ -152,7 +145,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
                       {log.watchedAt}
                     </td>
                     <td className="py-3 px-4">
-                      <img
+                      <Image width={40} height={56}
                         src={log.posterUrl}
                         alt={log.showTitle}
                         className="w-10 h-14 object-cover rounded-md shadow border border-[#2c3642]"

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Show } from "@/types";
+import Image from "next/image";
+import { Show, ShowSearchResult } from "@/types";
 import { Search, Plus, X, Loader2, Sparkles, TrendingUp } from "lucide-react";
 import { INITIAL_SHOWS } from "@/lib/catalog";
 
@@ -12,6 +13,20 @@ interface SearchShowModalProps {
   existingShowIds: string[];
 }
 
+/** Séries do catálogo demo no mesmo formato da busca (usado quando o TMDB não responde). */
+function catalogResults(): ShowSearchResult[] {
+  return INITIAL_SHOWS.map((s) => ({
+    id: s.id,
+    tmdbId: s.tmdbId ?? 0,
+    title: s.title,
+    firstAirYear: s.firstAirYear,
+    posterUrl: s.posterUrl,
+    backdropUrl: s.backdropUrl,
+    overview: s.overview,
+    voteAverage: 0,
+  }));
+}
+
 export const SearchShowModal: React.FC<SearchShowModalProps> = ({
   isOpen,
   onClose,
@@ -19,101 +34,77 @@ export const SearchShowModal: React.FC<SearchShowModalProps> = ({
   existingShowIds,
 }) => {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
-  const [trending, setTrending] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const trimmedQuery = query.trim();
+  // Resultado guardado junto com o termo buscado: assim respostas antigas não
+  // aparecem para um termo novo, e "carregando" é derivado sem estado extra.
+  const [search, setSearch] = useState<{ query: string; items: ShowSearchResult[] }>({ query: "", items: [] });
+  const [trending, setTrending] = useState<ShowSearchResult[]>([]);
   const [addingId, setAddingId] = useState<string | null>(null);
 
   // Fetch trending on open
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
 
-    async function loadTrending() {
+    (async () => {
+      let items: ShowSearchResult[] = [];
       try {
         const res = await fetch("/api/tmdb/trending");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            setTrending(data.results);
-            return;
-          }
-        }
+        if (res.ok) items = ((await res.json()).results as ShowSearchResult[]) ?? [];
       } catch (err) {
         console.warn("Trending fetch failed:", err);
       }
+      if (!cancelled) setTrending(items.length > 0 ? items : catalogResults());
+    })();
 
-      // Fallback trending from INITIAL_SHOWS
-      setTrending(
-        INITIAL_SHOWS.map((s) => ({
-          id: s.id,
-          tmdbId: s.tmdbId || s.id,
-          title: s.title,
-          firstAirYear: s.firstAirYear,
-          posterUrl: s.posterUrl,
-          backdropUrl: s.backdropUrl,
-          overview: s.overview,
-          voteAverage: 8.8,
-        }))
-      );
-    }
-
-    loadTrending();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   // Debounced search
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!trimmedQuery) return;
+    let cancelled = false;
 
     const timer = setTimeout(async () => {
-      setLoading(true);
+      let items: ShowSearchResult[] = [];
       try {
-        const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          setResults(data.results);
-        } else {
-          // Local catalog fallback search
-          const q = query.toLowerCase();
-          const localMatches = INITIAL_SHOWS.filter((s) => s.title.toLowerCase().includes(q)).map((s) => ({
-            id: s.id,
-            tmdbId: s.tmdbId || s.id,
-            title: s.title,
-            firstAirYear: s.firstAirYear,
-            posterUrl: s.posterUrl,
-            backdropUrl: s.backdropUrl,
-            overview: s.overview,
-            voteAverage: 9.0,
-          }));
-          setResults(localMatches);
-        }
+        const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(trimmedQuery)}`);
+        if (res.ok) items = ((await res.json()).results as ShowSearchResult[]) ?? [];
       } catch (err) {
         console.error("Erro ao buscar no TMDB:", err);
-      } finally {
-        setLoading(false);
       }
+      if (items.length === 0) {
+        const q = trimmedQuery.toLowerCase();
+        items = catalogResults().filter((s) => s.title.toLowerCase().includes(q));
+      }
+      if (!cancelled) setSearch({ query: trimmedQuery, items });
     }, 400);
 
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [trimmedQuery]);
 
   if (!isOpen) return null;
 
-  const handleSelectShow = async (item: any) => {
+  const loading = !!trimmedQuery && search.query !== trimmedQuery;
+
+  const handleSelectShow = async (item: ShowSearchResult) => {
     setAddingId(String(item.tmdbId || item.id));
     try {
-      // Check if it's in INITIAL_SHOWS first
-      const localShow = INITIAL_SHOWS.find((s) => s.id === item.id || String(s.tmdbId) === String(item.tmdbId));
+      // Séries do catálogo demo já têm todos os dados locais.
+      const localShow = INITIAL_SHOWS.find((s) => s.id === item.id || s.tmdbId === item.tmdbId);
       if (localShow) {
         onAddShow(localShow);
         onClose();
         return;
       }
 
-      const res = await fetch(`/api/tmdb/show/${item.tmdbId || item.id}`);
-      const data = await res.json();
+      const res = await fetch(`/api/tmdb/show/${item.tmdbId}`);
+      const data = (await res.json()) as { show?: Show };
       if (data.show) {
         onAddShow(data.show);
         onClose();
@@ -125,7 +116,7 @@ export const SearchShowModal: React.FC<SearchShowModalProps> = ({
     }
   };
 
-  const displayedList = query.trim() ? results : trending;
+  const displayedList = trimmedQuery ? (loading ? [] : search.items) : trending;
   const listTitle = query.trim() ? "Resultados da Pesquisa" : "Em Alta nesta Semana";
 
   return (
@@ -187,7 +178,7 @@ export const SearchShowModal: React.FC<SearchShowModalProps> = ({
                   className="bg-[#14181c] border border-[#2c3642] hover:border-[#384656] p-3 rounded-xl flex items-center justify-between gap-4 transition-all"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <img
+                    <Image width={48} height={64}
                       src={item.posterUrl}
                       alt={item.title}
                       className="w-12 h-16 rounded-md object-cover bg-[#242f38] shrink-0"

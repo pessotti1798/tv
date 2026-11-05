@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Show, Episode } from "@/types";
 import { Clock, Check, Calendar as CalendarIcon, Sparkles, Plus, Layers, Loader2, AlertTriangle } from "lucide-react";
 import { ShowSchedule, addDays, daysBetween, fetchSchedule, parseISODate, toISODate } from "@/lib/episodes";
@@ -160,7 +161,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             className="w-20 h-28 rounded-xl bg-[#2c3642] shrink-0 overflow-hidden cursor-pointer relative"
             onClick={() => (isSingle ? onSelectEpisode(first) : onOpenShowDetails(show))}
           >
-            <img
+            <Image fill sizes="80px"
               src={show.posterUrl}
               alt={show.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

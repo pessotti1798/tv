@@ -104,3 +104,15 @@ export interface UserList {
   userLiked?: boolean;
   createdAt: string;
 }
+
+/** Item de busca/tendências do TMDB, antes de virar uma `Show` completa. */
+export interface ShowSearchResult {
+  id: string;
+  tmdbId: number;
+  title: string;
+  firstAirYear: string;
+  posterUrl: string;
+  backdropUrl: string;
+  overview: string;
+  voteAverage: number;
+}
