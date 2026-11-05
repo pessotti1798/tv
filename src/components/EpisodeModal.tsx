@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { Episode, Review } from "@/types";
+import { DiaryLogOptions, Episode, Review } from "@/types";
+import { toISODate } from "@/lib/episodes";
 import { Check, Star, X, MessageSquare, Heart, ShieldAlert, Users, Film } from "lucide-react";
 
 interface EpisodeModalProps {
@@ -12,11 +13,13 @@ interface EpisodeModalProps {
   userRating: number;
   reviews: Review[];
   onClose: () => void;
-  onToggleWatch: () => void;
+  onToggleWatch: (log: DiaryLogOptions) => void;
+  /** Registra mais uma sessão de um episódio já visto (rewatch). */
+  onLogWatch: (log: DiaryLogOptions) => void;
   onMarkSeasonWatched: () => void;
   onMarkShowWatched: () => void;
   onSetRating: (rating: number) => void;
-  onAddReview: (content: string, hasSpoilers: boolean) => void;
+  onAddReview: (content: string, hasSpoilers: boolean, log: DiaryLogOptions) => void;
   onLikeReview?: (reviewId: string) => void;
 }
 
@@ -28,6 +31,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
   reviews,
   onClose,
   onToggleWatch,
+  onLogWatch,
   onMarkSeasonWatched,
   onMarkShowWatched,
   onSetRating,
@@ -39,15 +43,20 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
   const [reviewInput, setReviewInput] = useState<string>("");
   const [hasSpoilersFlag, setHasSpoilersFlag] = useState<boolean>(false);
   const [saveToDiary, setSaveToDiary] = useState<boolean>(true);
-  const [isRewatch, setIsRewatch] = useState<boolean>(false);
+  // Se o episódio já foi visto, o próximo registro é naturalmente um rewatch.
+  const [isRewatch, setIsRewatch] = useState<boolean>(isWatched);
+  const [today] = useState(() => toISODate(new Date()));
+  const [watchDate, setWatchDate] = useState<string>(today);
 
   if (!isOpen || !episode) return null;
 
   const isUnlocked = isWatched || forceUnlock;
 
+  const logOptions = (): DiaryLogOptions => ({ save: saveToDiary, isRewatch, date: watchDate || today });
+
   const handlePostReview = () => {
     if (!reviewInput.trim()) return;
-    onAddReview(reviewInput.trim(), hasSpoilersFlag);
+    onAddReview(reviewInput.trim(), hasSpoilersFlag, logOptions());
     setReviewInput("");
   };
 
@@ -117,7 +126,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
               
               {/* Watch Toggle Button */}
               <button
-                onClick={onToggleWatch}
+                onClick={() => onToggleWatch(logOptions())}
                 className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   isWatched
                     ? "bg-[#242f38] text-[#00e054] hover:bg-[#2c3642]"
@@ -182,8 +191,8 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
               </div>
             </div>
 
-            {/* Quick Flags */}
-            <div className="flex items-center gap-4 text-xs text-[#8b9baa]">
+            {/* Diary Options: valem para "Marcar como Assistido", "Registrar no Diário" e "Publicar Resenha" */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#8b9baa] w-full">
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-white transition-colors">
                 <input
                   type="checkbox"
@@ -192,6 +201,17 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
                   className="accent-[#00e054] rounded"
                 />
                 <span>Salvar no Diário</span>
+              </label>
+              <label className={`flex items-center gap-1.5 ${saveToDiary ? "" : "opacity-40"}`}>
+                <span>Assistido em</span>
+                <input
+                  type="date"
+                  value={watchDate}
+                  max={today}
+                  disabled={!saveToDiary}
+                  onChange={(e) => setWatchDate(e.target.value)}
+                  className="bg-[#1b2228] border border-[#2c3642] rounded-md px-1.5 py-0.5 text-white [color-scheme:dark] disabled:cursor-not-allowed"
+                />
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-white transition-colors">
                 <input
@@ -202,6 +222,16 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
                 />
                 <span>🔁 Rewatch</span>
               </label>
+              {isWatched && (
+                <button
+                  type="button"
+                  onClick={() => onLogWatch({ ...logOptions(), save: true })}
+                  className="ml-auto px-2.5 py-1 rounded-lg bg-[#1f272f] hover:bg-[#242f38] text-white font-medium border border-[#2c3642] transition-colors cursor-pointer"
+                  title="Adiciona mais uma sessão deste episódio ao diário"
+                >
+                  + Registrar no Diário
+                </button>
+              )}
             </div>
 
             {/* Batch Actions */}
@@ -280,7 +310,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
                 </p>
                 <div className="flex items-center justify-center gap-4 pt-2">
                   <button
-                    onClick={onToggleWatch}
+                    onClick={() => onToggleWatch(logOptions())}
                     className="px-4 py-2 rounded-xl bg-[#00e054] hover:bg-[#00c749] text-black font-bold text-xs transition-colors cursor-pointer"
                   >
                     Marcar como Visto & Desbloquear

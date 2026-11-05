@@ -53,7 +53,7 @@ export interface WatchLog {
   episodeCode: string;
   episodeTitle: string;
   posterUrl: string;
-  watchedAt: string;
+  watchedAt: string; // data local no formato YYYY-MM-DD
   rating?: number; // 0.5 to 5.0
   reviewText?: string;
   hasSpoilers?: boolean;
@@ -115,4 +115,14 @@ export interface ShowSearchResult {
   backdropUrl: string;
   overview: string;
   voteAverage: number;
+}
+
+/** Como registrar uma sessão no diário (opções da ficha do episódio). */
+export interface DiaryLogOptions {
+  /** Cria um registro no diário. */
+  save: boolean;
+  /** Marca o registro como rewatch. */
+  isRewatch: boolean;
+  /** Data em que assistiu, YYYY-MM-DD. */
+  date: string;
 }

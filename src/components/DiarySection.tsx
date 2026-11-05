@@ -3,12 +3,25 @@
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { WatchLog } from "@/types";
+import { formatDiaryDate, parseISODate } from "@/lib/episodes";
 import { Trash2, Search, BookOpen } from "lucide-react";
 
 interface DiarySectionProps {
   logs: WatchLog[];
   onDeleteLog?: (logId: string) => void;
   onSelectEpisodeById?: (episodeId: string, showId: string) => void;
+}
+
+type SortOption = "recent" | "oldest" | "rating";
+
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+function monthLabel(iso: string): string {
+  if (!/^\d{4}-\d{2}/.test(iso)) return "Sem data";
+  const label = parseISODate(`${monthKey(iso)}-01`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export const DiarySection: React.FC<DiarySectionProps> = ({
@@ -18,6 +31,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
 }) => {
   const [filterType, setFilterType] = useState<"all" | "review" | "rewatch">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortOption>("recent");
 
   const filteredLogs = useMemo(() => {
     let result = [...logs];
@@ -41,8 +55,19 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
       );
     }
 
-    return result;
-  }, [logs, filterType, searchQuery]);
+    // Ordena. O índice original desempata: registros mais novos vêm primeiro no array.
+    const indexed = result.map((log, index) => ({ log, index }));
+    indexed.sort((a, b) => {
+      if (sortBy === "rating") {
+        return (b.log.rating || 0) - (a.log.rating || 0) || b.log.watchedAt.localeCompare(a.log.watchedAt) || a.index - b.index;
+      }
+      const byDate = a.log.watchedAt.localeCompare(b.log.watchedAt);
+      return sortBy === "oldest" ? byDate || b.index - a.index : -byDate || a.index - b.index;
+    });
+    return indexed.map((i) => i.log);
+  }, [logs, filterType, searchQuery, sortBy]);
+
+  const groupByMonth = sortBy !== "rating";
 
   return (
     <section className="space-y-6 animate-fadeIn">
@@ -74,6 +99,17 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
               className="bg-[#1b2228] border border-[#2c3642] focus:border-[#00e054] rounded-xl py-1.5 pl-8 pr-3 text-xs text-white placeholder-[#687684] focus:outline-none transition-colors w-40 sm:w-52"
             />
           </div>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            aria-label="Ordenar diário"
+            className="bg-[#1b2228] border border-[#2c3642] rounded-xl py-1.5 px-2.5 text-xs text-white focus:outline-none focus:border-[#00e054] cursor-pointer"
+          >
+            <option value="recent">Mais recentes</option>
+            <option value="oldest">Mais antigos</option>
+            <option value="rating">Maior nota</option>
+          </select>
 
           <div className="flex items-center gap-1 bg-[#1b2228] p-1 rounded-xl border border-[#2c3642] text-xs">
             <button
@@ -131,9 +167,16 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                filteredLogs.map((log, i) => (
+                  <React.Fragment key={log.id}>
+                  {groupByMonth && (i === 0 || monthKey(filteredLogs[i - 1].watchedAt) !== monthKey(log.watchedAt)) && (
+                    <tr className="bg-[#14181c]/60">
+                      <td colSpan={7} className="py-2 px-4 text-[11px] font-semibold tracking-wider uppercase text-[#00e054]">
+                        {monthLabel(log.watchedAt)}
+                      </td>
+                    </tr>
+                  )}
                   <tr
-                    key={log.id}
                     className="hover:bg-[#222b34]/50 transition-colors group cursor-pointer"
                     onClick={() => {
                       if (onSelectEpisodeById) {
@@ -142,7 +185,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
                     }}
                   >
                     <td className="py-3 px-4 font-mono text-[#8b9baa] text-xs whitespace-nowrap">
-                      {log.watchedAt}
+                      {formatDiaryDate(log.watchedAt)}
                     </td>
                     <td className="py-3 px-4">
                       <Image width={40} height={56}
@@ -199,6 +242,7 @@ export const DiarySection: React.FC<DiarySectionProps> = ({
                       )}
                     </td>
                   </tr>
+                  </React.Fragment>
                 ))
               )}
             </tbody>

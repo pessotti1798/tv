@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Episode, Show, WatchLog, Review, UserProfile, UserList } from "@/types";
+import { DiaryLogOptions, Episode, Show, WatchLog, Review, UserProfile, UserList } from "@/types";
 import {
   INITIAL_SHOWS,
   INITIAL_REVIEWS,
@@ -17,7 +17,6 @@ import {
   buildPlaceholderEpisode,
   compareRefs,
   fetchEpisode,
-  formatWatchDate,
   getAllEpisodeIds,
   getLastEpisodeRef,
   getNextEpisodeRef,
@@ -26,6 +25,7 @@ import {
   getSeasonEpisodeCount,
   makeEpisodeId,
   parseEpisodeId,
+  toISODate,
   withProgress,
 } from "@/lib/episodes";
 import { Navbar } from "@/components/Navbar";
@@ -39,6 +39,9 @@ import { ShowDetailsModal } from "@/components/ShowDetailsModal";
 import { SearchShowModal } from "@/components/SearchShowModal";
 
 const refOf = (ep: Episode): EpisodeRef => ({ season: ep.seasonNumber, episode: ep.episodeNumber });
+
+/** Padrão dos botões "Marcar Visto" fora da ficha: registra hoje no diário. */
+const DEFAULT_LOG_OPTIONS = (): DiaryLogOptions => ({ save: true, isRewatch: false, date: toISODate(new Date()) });
 
 /** Lê todos os dados salvos (com a migração de IDs antigos). Só roda no navegador. */
 function loadStoredData() {
@@ -157,7 +160,9 @@ export default function EpisodicApp() {
     replaceShow({ ...show, completed: true }, watched);
   };
 
-  const makeDiaryEntry = (show: Show | undefined, episode: Episode): WatchLog => ({
+  type DiaryExtras = Partial<Pick<WatchLog, "watchedAt" | "isRewatch" | "reviewText" | "hasSpoilers">>;
+
+  const makeDiaryEntry = (show: Show | undefined, episode: Episode, extras: DiaryExtras = {}): WatchLog => ({
     id: `log-${Date.now()}-${episode.id}`,
     episodeId: episode.id,
     showId: show?.id ?? episode.showId,
@@ -165,17 +170,26 @@ export default function EpisodicApp() {
     episodeCode: episode.code,
     episodeTitle: episode.title,
     posterUrl: show?.posterUrl ?? episode.stillUrl,
-    watchedAt: formatWatchDate(),
+    watchedAt: toISODate(new Date()),
     rating: userRatings[episode.id] || undefined,
     isRewatch: false,
+    ...extras,
   });
+
+  /**
+   * Ao desmarcar um episódio, remove do diário só os registros sem resenha:
+   * resenhas escritas não somem por um clique (podem ser apagadas no Diário).
+   */
+  const dropUnreviewedLogs = (episodeId: string) => {
+    setDiaryLogs((prev) => prev.filter((l) => l.episodeId !== episodeId || !!l.reviewText?.trim()));
+  };
 
   // ---------------------------------------------------------------------------
   // Ações de "assistido"
   // ---------------------------------------------------------------------------
 
   // Marca/desmarca um episódio qualquer e ajusta o próximo episódio da série.
-  const handleToggleWatch = (episode: Episode) => {
+  const handleToggleWatch = (episode: Episode, log: DiaryLogOptions = DEFAULT_LOG_OPTIONS()) => {
     const isNowWatched = !watchedEpisodes[episode.id];
     const newWatched = { ...watchedEpisodes };
     if (isNowWatched) newWatched[episode.id] = true;
@@ -184,10 +198,11 @@ export default function EpisodicApp() {
 
     const show = shows.find((s) => s.id === episode.showId);
 
-    if (isNowWatched) {
-      setDiaryLogs((prev) => [makeDiaryEntry(show, episode), ...prev]);
-    } else {
-      setDiaryLogs((prev) => prev.filter((l) => l.episodeId !== episode.id));
+    if (isNowWatched && log.save) {
+      const entry = makeDiaryEntry(show, episode, { watchedAt: log.date, isRewatch: log.isRewatch });
+      setDiaryLogs((prev) => [entry, ...prev]);
+    } else if (!isNowWatched) {
+      dropUnreviewedLogs(episode.id);
     }
 
     if (!show) return;
@@ -219,7 +234,7 @@ export default function EpisodicApp() {
     const newWatched = { ...watchedEpisodes };
     delete newWatched[prevId];
     setWatchedEpisodes(newWatched);
-    setDiaryLogs((logs) => logs.filter((l) => l.episodeId !== prevId));
+    dropUnreviewedLogs(prevId);
     setCurrentEpisodeRef(show, prev, newWatched);
   };
 
@@ -257,7 +272,7 @@ export default function EpisodicApp() {
       episodeCode: `T${seasonNum < 10 ? "0" + seasonNum : seasonNum}`,
       episodeTitle: `Temporada ${seasonNum} Completa`,
       posterUrl: show.posterUrl,
-      watchedAt: formatWatchDate(),
+      watchedAt: toISODate(new Date()),
       reviewText: `Temporada ${seasonNum} inteira marcada como assistida.`,
       isRewatch: false,
     };
@@ -282,7 +297,7 @@ export default function EpisodicApp() {
       episodeCode: "COMPLETA",
       episodeTitle: `Todos os ${show.totalEpisodes} episódios`,
       posterUrl: show.posterUrl,
-      watchedAt: formatWatchDate(),
+      watchedAt: toISODate(new Date()),
       reviewText: "Série completa assistida e arquivada com sucesso.",
       isRewatch: false,
     };
@@ -304,14 +319,17 @@ export default function EpisodicApp() {
       else delete next[id];
       return next;
     });
-    setDiaryLogs((prev) =>
-      prev.map((l) => (l.episodeId === id ? { ...l, rating: rating > 0 ? rating : undefined } : l))
-    );
+    // A nota vale para o registro mais recente do episódio (rewatches anteriores mantêm a sua).
+    setDiaryLogs((prev) => {
+      const latest = prev.findIndex((l) => l.episodeId === id);
+      return prev.map((l, i) => (i === latest ? { ...l, rating: rating > 0 ? rating : undefined } : l));
+    });
   };
 
   // Add Review
-  const handleAddReview = (content: string, hasSpoilers: boolean) => {
+  const handleAddReview = (content: string, hasSpoilers: boolean, log: DiaryLogOptions) => {
     if (!selectedEpisode) return;
+    const episode = selectedEpisode;
 
     const newReview: Review = {
       id: `rev-${Date.now()}`,
@@ -331,10 +349,41 @@ export default function EpisodicApp() {
       [selectedEpisode.id]: [newReview, ...(prev[selectedEpisode.id] || [])],
     }));
 
-    // Ensure episode is marked as watched
-    if (!watchedEpisodes[selectedEpisode.id]) {
-      handleToggleWatch(selectedEpisode);
+    // Resenha implica ter assistido. O registro no diário é feito abaixo.
+    if (!watchedEpisodes[episode.id]) {
+      handleToggleWatch(episode, { ...log, save: false });
     }
+
+    if (log.save) {
+      const show = shows.find((s) => s.id === episode.showId);
+      setDiaryLogs((prev) => {
+        // Se já existe um registro do mesmo dia sem resenha, a resenha entra nele.
+        const idx = prev.findIndex(
+          (l) =>
+            l.episodeId === episode.id &&
+            l.watchedAt === log.date &&
+            !!l.isRewatch === log.isRewatch &&
+            !l.reviewText?.trim()
+        );
+        if (idx >= 0) {
+          return prev.map((l, i) => (i === idx ? { ...l, reviewText: content, hasSpoilers } : l));
+        }
+        const entry = makeDiaryEntry(show, episode, {
+          watchedAt: log.date,
+          isRewatch: log.isRewatch,
+          reviewText: content,
+          hasSpoilers,
+        });
+        return [entry, ...prev];
+      });
+    }
+  };
+
+  // Registra mais uma sessão de um episódio já visto (rewatch), sem mexer no progresso.
+  const handleLogWatch = (episode: Episode, log: DiaryLogOptions) => {
+    const show = shows.find((s) => s.id === episode.showId);
+    const entry = makeDiaryEntry(show, episode, { watchedAt: log.date, isRewatch: log.isRewatch });
+    setDiaryLogs((prev) => [entry, ...prev]);
   };
 
   // Like / unlike Review
@@ -504,7 +553,8 @@ export default function EpisodicApp() {
           userRating={userRatings[selectedEpisode.id] || 0}
           reviews={reviewsMap[selectedEpisode.id] || []}
           onClose={() => setIsEpisodeModalOpen(false)}
-          onToggleWatch={() => handleToggleWatch(selectedEpisode)}
+          onToggleWatch={(log) => handleToggleWatch(selectedEpisode, log)}
+          onLogWatch={(log) => handleLogWatch(selectedEpisode, log)}
           onMarkSeasonWatched={() =>
             handleMarkSeasonWatched(selectedEpisode.showId, selectedEpisode.seasonNumber)
           }

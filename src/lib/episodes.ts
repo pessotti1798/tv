@@ -138,9 +138,29 @@ export function withProgress(show: Show, watched: Record<string, boolean>): Show
   };
 }
 
-/** Data de exibição no diário, ex.: "4 de nov., 2026". */
-export function formatWatchDate(date: Date = new Date()): string {
-  return `${date.getDate()} de ${date.toLocaleString("pt-BR", { month: "short" })}, ${date.getFullYear()}`;
+/** Data de exibição no diário, ex.: "04 nov. 2026". */
+export function formatDiaryDate(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [y, m, d] = iso.split("-");
+  return `${d} ${PT_MONTHS[Number(m) - 1]}. ${y}`;
+}
+
+const PT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/**
+ * Converte datas de diário salvas por versões antigas ("09 de abr., 2023",
+ * "4 de Nov, 2026", "Hoje") para YYYY-MM-DD. Quando o texto não tem data,
+ * usa o horário embutido no ID do registro (ex.: "log-1793836490507").
+ */
+export function legacyDiaryDateToISO(text: string, logId: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const match = /(\d{1,2})\s+de\s+([a-zç]{3})[a-zç]*\.?,?\s+(\d{4})/i.exec(text);
+  if (match) {
+    const month = PT_MONTHS.indexOf(match[2].toLowerCase());
+    if (month >= 0) return toISODate(new Date(Number(match[3]), month, Number(match[1])));
+  }
+  const stamp = /(\d{12,})/.exec(logId);
+  return toISODate(stamp ? new Date(Number(stamp[1])) : new Date());
 }
 
 // ---------------------------------------------------------------------------

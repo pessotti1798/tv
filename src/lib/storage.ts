@@ -8,6 +8,7 @@ import {
   DEMO_RATINGS,
   DEMO_DIARY,
 } from "./catalog";
+import { legacyDiaryDateToISO } from "./episodes";
 
 export const STORAGE_KEYS = {
   SHOWS: "episodic_shows",
@@ -148,7 +149,12 @@ export function migrateLegacyData(): void {
   if (diary) {
     saveToStorage(
       STORAGE_KEYS.DIARY,
-      diary.map((l) => ({ ...l, episodeId: migrateId(l.episodeId) }))
+      diary.map((l) => ({
+        ...l,
+        episodeId: migrateId(l.episodeId),
+        // Datas antigas eram texto livre; agora são YYYY-MM-DD.
+        watchedAt: legacyDiaryDateToISO(l.watchedAt, l.id),
+      }))
     );
   }
   const shows = getFromStorage<Show[] | null>(STORAGE_KEYS.SHOWS, null);
