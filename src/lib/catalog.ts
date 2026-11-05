@@ -1,5 +1,8 @@
-import { Show, Review, UserProfile, UserList, WatchLog, SeasonInfo } from "@/types";
-import { getEpisodeIdsBefore, withProgress } from "./episodes";
+import { Episode, Show, Review, UserProfile, UserList, WatchLog, SeasonInfo } from "@/types";
+import { getEpisodeIdsBefore } from "./episodes";
+
+/** Série demo com o episódio atual já detalhado (usado para montar o estado inicial). */
+type DemoShow = Show & { currentEpisode: Episode };
 
 function seasonsFromCounts(counts: number[]): SeasonInfo[] {
   return counts.map((episodeCount, idx) => ({
@@ -9,7 +12,7 @@ function seasonsFromCounts(counts: number[]): SeasonInfo[] {
   }));
 }
 
-const RAW_SHOWS: Show[] = [
+const RAW_SHOWS: DemoShow[] = [
   {
     id: "severance",
     tmdbId: 95396,
@@ -22,8 +25,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 2,
     totalEpisodes: 19,
     seasons: seasonsFromCounts([9, 10]),
-    progressText: "3 de 10 episódios (30%)",
-    progressPercent: 30,
     currentEpisode: {
       id: "severance-2-4",
       showId: "severance",
@@ -53,8 +54,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 4,
     totalEpisodes: 39,
     seasons: seasonsFromCounts([10, 10, 9, 10]),
-    progressText: "29 de 39 episódios (74%)",
-    progressPercent: 74,
     currentEpisode: {
       id: "succession-4-3",
       showId: "succession",
@@ -84,8 +83,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 3,
     totalEpisodes: 28,
     seasons: seasonsFromCounts([8, 10, 10]),
-    progressText: "18 de 28 episódios (64%)",
-    progressPercent: 64,
     currentEpisode: {
       id: "the-bear-3-1",
       showId: "the-bear",
@@ -115,8 +112,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 2,
     totalEpisodes: 18,
     seasons: seasonsFromCounts([10, 8]),
-    progressText: "14 de 18 episódios (77%)",
-    progressPercent: 77,
     currentEpisode: {
       id: "house-of-dragon-2-4",
       showId: "house-of-dragon",
@@ -146,8 +141,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 1,
     totalEpisodes: 10,
     seasons: seasonsFromCounts([10]),
-    progressText: "8 de 10 episódios (80%)",
-    progressPercent: 80,
     currentEpisode: {
       id: "shogun-1-9",
       showId: "shogun",
@@ -177,8 +170,6 @@ const RAW_SHOWS: Show[] = [
     totalSeasons: 2,
     totalEpisodes: 18,
     seasons: seasonsFromCounts([9, 9]),
-    progressText: "9 de 18 episódios (50%)",
-    progressPercent: 50,
     currentEpisode: {
       id: "arcane-2-1",
       showId: "arcane",
@@ -208,7 +199,15 @@ export const DEMO_WATCHED: Record<string, boolean> = Object.fromEntries(
   )
 );
 
-export const INITIAL_SHOWS: Show[] = RAW_SHOWS.map((show) => withProgress(show, DEMO_WATCHED));
+export const INITIAL_SHOWS: Show[] = RAW_SHOWS.map(({ currentEpisode, ...show }) => ({
+  ...show,
+  runtime: currentEpisode.runtime,
+}));
+
+/** Detalhes dos episódios atuais do demo (os demais vêm do TMDB). */
+export const DEMO_EPISODE_CACHE: Record<string, Episode> = Object.fromEntries(
+  RAW_SHOWS.map((show) => [show.currentEpisode.id, show.currentEpisode])
+);
 
 export const DEMO_RATINGS: Record<string, number> = {
   "succession-4-3": 5.0,

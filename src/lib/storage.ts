@@ -1,4 +1,4 @@
-import { Show, WatchLog, Review, UserProfile, UserList } from "@/types";
+import { Episode, Show, WatchLog, Review, UserProfile, UserList } from "@/types";
 import {
   INITIAL_SHOWS,
   INITIAL_REVIEWS,
@@ -7,8 +7,15 @@ import {
   DEMO_WATCHED,
   DEMO_RATINGS,
   DEMO_DIARY,
+  DEMO_EPISODE_CACHE,
 } from "./catalog";
-import { legacyDiaryDateToISO } from "./episodes";
+import {
+  deriveNextEpisodeRef,
+  getAllEpisodeIds,
+  isPlaceholderEpisode,
+  legacyDiaryDateToISO,
+  makeEpisodeId,
+} from "./episodes";
 
 export const STORAGE_KEYS = {
   SHOWS: "episodic_shows",
@@ -18,6 +25,8 @@ export const STORAGE_KEYS = {
   REVIEWS: "episodic_reviews",
   LISTS: "episodic_lists",
   PROFILE: "episodic_profile",
+  /** Detalhes de episódios já carregados (título, sinopse, imagem). */
+  EPISODES: "episodic_episodes",
 } as const;
 
 export interface EpisodicBackupData {
@@ -30,6 +39,7 @@ export interface EpisodicBackupData {
   reviews: Record<string, Review[]>;
   lists: UserList[];
   profile: UserProfile;
+  episodes?: Record<string, Episode>;
 }
 
 export function getFromStorage<T>(key: string, defaultValue: T): T {
@@ -63,6 +73,7 @@ export function exportBackupData(): string {
     reviews: getFromStorage(STORAGE_KEYS.REVIEWS, {}),
     lists: getFromStorage(STORAGE_KEYS.LISTS, []),
     profile: getFromStorage(STORAGE_KEYS.PROFILE, INITIAL_USER_PROFILE),
+    episodes: getFromStorage(STORAGE_KEYS.EPISODES, {}),
   };
   return JSON.stringify(data, null, 2);
 }
@@ -79,6 +90,7 @@ export function importBackupData(jsonString: string): boolean {
     if (parsed.reviews) saveToStorage(STORAGE_KEYS.REVIEWS, parsed.reviews);
     if (Array.isArray(parsed.lists)) saveToStorage(STORAGE_KEYS.LISTS, parsed.lists);
     if (parsed.profile) saveToStorage(STORAGE_KEYS.PROFILE, parsed.profile);
+    if (parsed.episodes) saveToStorage(STORAGE_KEYS.EPISODES, parsed.episodes);
 
     return true;
   } catch (err) {
@@ -89,6 +101,7 @@ export function importBackupData(jsonString: string): boolean {
 
 export function resetToDemoData(): void {
   saveToStorage(STORAGE_KEYS.SHOWS, INITIAL_SHOWS);
+  saveToStorage(STORAGE_KEYS.EPISODES, DEMO_EPISODE_CACHE);
   saveToStorage(STORAGE_KEYS.WATCHED, DEMO_WATCHED);
   saveToStorage(STORAGE_KEYS.RATINGS, DEMO_RATINGS);
   saveToStorage(STORAGE_KEYS.DIARY, DEMO_DIARY);
@@ -157,7 +170,7 @@ export function migrateLegacyData(): void {
       }))
     );
   }
-  const shows = getFromStorage<Show[] | null>(STORAGE_KEYS.SHOWS, null);
+  const shows = getFromStorage<LegacyShow[] | null>(STORAGE_KEYS.SHOWS, null);
   if (shows) {
     saveToStorage(
       STORAGE_KEYS.SHOWS,
@@ -183,4 +196,48 @@ export function migrateLegacyData(): void {
       lists.map((l) => ({ ...l, items: l.items.map((i) => ({ ...i, id: migrateId(i.id) })) }))
     );
   }
+  migrateToDerivedModel();
+}
+
+/** Formato antigo: a série guardava o episódio atual e o progresso já calculados. */
+type LegacyShow = Show & {
+  currentEpisode?: Episode;
+  progressText?: string;
+  progressPercent?: number;
+  completed?: boolean;
+};
+
+/**
+ * Converte séries do formato antigo para o modelo derivado, preservando o que o
+ * usuário via: o episódio atual vira foco (se diferir do calculado), séries
+ * concluídas ficam com todos os episódios vistos e os detalhes do episódio
+ * atual vão para o cache.
+ */
+function migrateToDerivedModel(): void {
+  const shows = getFromStorage<LegacyShow[] | null>(STORAGE_KEYS.SHOWS, null);
+  if (!shows || !shows.some((s) => "currentEpisode" in s || "progressText" in s || "completed" in s)) return;
+
+  const watched = { ...getFromStorage<Record<string, boolean>>(STORAGE_KEYS.WATCHED, {}) };
+  const cache = { ...getFromStorage<Record<string, Episode>>(STORAGE_KEYS.EPISODES, {}) };
+
+  const migrated: Show[] = shows.map((legacy) => {
+    const { currentEpisode, progressText: _text, progressPercent: _percent, completed, ...show } = legacy;
+    void _text;
+    void _percent;
+    const result: Show = { ...show, runtime: show.runtime ?? currentEpisode?.runtime };
+
+    if (completed) {
+      getAllEpisodeIds(result).forEach((id) => (watched[id] = true));
+    } else if (currentEpisode) {
+      const derived = deriveNextEpisodeRef(result, watched);
+      const derivedId = derived ? makeEpisodeId(result.id, derived.season, derived.episode) : null;
+      if (derivedId !== currentEpisode.id) result.focusEpisodeId = currentEpisode.id;
+    }
+    if (currentEpisode && !isPlaceholderEpisode(currentEpisode)) cache[currentEpisode.id] = currentEpisode;
+    return result;
+  });
+
+  saveToStorage(STORAGE_KEYS.SHOWS, migrated);
+  saveToStorage(STORAGE_KEYS.WATCHED, watched);
+  saveToStorage(STORAGE_KEYS.EPISODES, cache);
 }

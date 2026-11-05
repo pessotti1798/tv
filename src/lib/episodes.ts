@@ -1,4 +1,4 @@
-import { Episode, SeasonInfo, Show } from "@/types";
+import { Episode, SeasonInfo, Show, TrackedShow } from "@/types";
 
 /** Posição de um episódio dentro da série. */
 export interface EpisodeRef {
@@ -6,7 +6,8 @@ export interface EpisodeRef {
   episode: number;
 }
 
-const DEFAULT_RUNTIME = 50;
+export const DEFAULT_RUNTIME = 50;
+const PLACEHOLDER_OVERVIEW = "Sinopse ainda não carregada.";
 
 export function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -114,28 +115,74 @@ export function buildPlaceholderEpisode(show: Show, ref: EpisodeRef): Episode {
     episodeNumber: ref.episode,
     code: episodeCode(ref.season, ref.episode),
     title: `Episódio ${ref.episode}`,
-    runtime: show.currentEpisode?.runtime || DEFAULT_RUNTIME,
+    runtime: show.runtime || DEFAULT_RUNTIME,
     airDate: "—",
-    overview: "Sinopse ainda não carregada.",
+    overview: PLACEHOLDER_OVERVIEW,
     stillUrl: show.backdropUrl,
     backdropUrl: show.backdropUrl,
     averageRating: 0,
   };
 }
 
-/** Recalcula os campos de progresso a partir dos episódios realmente vistos. */
-export function withProgress(show: Show, watched: Record<string, boolean>): Show {
-  const total = show.totalEpisodes || getAllEpisodeIds(show).length;
-  const watchedCount = getAllEpisodeIds(show).filter((id) => watched[id]).length;
-  if (show.completed) {
-    return { ...show, progressPercent: 100, progressText: "Série Concluída (100%)" };
+/**
+ * Próximo episódio a assistir, calculado só a partir dos episódios vistos:
+ * - com foco ("Focar no Radar"): o primeiro não visto a partir do foco;
+ * - sem foco (ou foco já todo visto): o episódio seguinte ao mais avançado visto
+ *   (ou o primeiro da série, se nada foi visto).
+ * Retorna null quando não há mais episódios: a série está concluída.
+ */
+export function deriveNextEpisodeRef(show: Show, watched: Record<string, boolean>): EpisodeRef | null {
+  const ids = getAllEpisodeIds(show);
+
+  const focus = show.focusEpisodeId ? parseEpisodeId(show.focusEpisodeId) : null;
+  if (focus) {
+    for (const id of ids) {
+      const ref = parseEpisodeId(id)!;
+      if (compareRefs(ref, focus) >= 0 && !watched[id]) return ref;
+    }
   }
-  const percent = total > 0 ? Math.min(100, Math.round((watchedCount / total) * 100)) : 0;
+
+  let furthest: EpisodeRef | null = null;
+  for (const id of ids) {
+    if (watched[id]) furthest = parseEpisodeId(id);
+  }
+  if (!furthest) {
+    const first = getSeasonNumbers(show).find((n) => getSeasonEpisodeCount(show, n) > 0);
+    return first !== undefined ? { season: first, episode: 1 } : null;
+  }
+  return getNextEpisodeRef(show, furthest);
+}
+
+/** Junta os dados salvos da série com o que é derivado dos episódios vistos. */
+export function trackShow(
+  show: Show,
+  watched: Record<string, boolean>,
+  episodeCache: Record<string, Episode>
+): TrackedShow {
+  const ids = getAllEpisodeIds(show);
+  const total = show.totalEpisodes || ids.length;
+  const watchedCount = ids.filter((id) => watched[id]).length;
+
+  const next = deriveNextEpisodeRef(show, watched);
+  const completed = next === null;
+  const ref = next ?? getLastEpisodeRef(show) ?? { season: 1, episode: 1 };
+  const id = makeEpisodeId(show.id, ref.season, ref.episode);
+  const currentEpisode = episodeCache[id] ?? buildPlaceholderEpisode(show, ref);
+
+  const percent = completed ? 100 : total > 0 ? Math.min(100, Math.round((watchedCount / total) * 100)) : 0;
   return {
     ...show,
+    currentEpisode,
+    completed,
+    watchedCount,
     progressPercent: percent,
-    progressText: `${watchedCount} de ${total} episódios (${percent}%)`,
+    progressText: completed ? "Série Concluída (100%)" : `${watchedCount} de ${total} episódios (${percent}%)`,
   };
+}
+
+/** Indica se o episódio é só um provisório (sem dados reais do TMDB). */
+export function isPlaceholderEpisode(ep: Episode): boolean {
+  return ep.overview === PLACEHOLDER_OVERVIEW;
 }
 
 /** Data de exibição no diário, ex.: "04 nov. 2026". */

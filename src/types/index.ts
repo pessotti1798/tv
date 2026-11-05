@@ -38,11 +38,27 @@ export interface Show {
   overview: string;
   totalSeasons: number;
   totalEpisodes: number;
-  currentEpisode: Episode;
-  progressText: string;
-  progressPercent: number;
-  completed?: boolean;
   seasons?: SeasonInfo[];
+  /** Duração típica de um episódio, em minutos (usada quando o episódio não tem a sua). */
+  runtime?: number;
+  /**
+   * Episódio escolhido em "Focar no Radar". O próximo episódio passa a ser o
+   * primeiro não visto a partir dele. Ausente = segue o último episódio visto.
+   */
+  focusEpisodeId?: string;
+}
+
+/**
+ * Série como a interface usa: os dados salvos (`Show`) mais o que é calculado
+ * a partir dos episódios vistos. Nada daqui é salvo.
+ */
+export interface TrackedShow extends Show {
+  /** Próximo episódio a assistir (ou o último, se a série foi concluída). */
+  currentEpisode: Episode;
+  completed: boolean;
+  watchedCount: number;
+  progressPercent: number;
+  progressText: string;
 }
 
 export interface WatchLog {

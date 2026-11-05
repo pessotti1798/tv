@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Show, Episode, SeasonInfo } from "@/types";
+import { Episode, SeasonInfo, TrackedShow } from "@/types";
 import { buildPlaceholderEpisode, fetchSeason, getSeasonEpisodeCount, getSeasonNumbers } from "@/lib/episodes";
 import { X, Check, CheckCheck, Loader2 } from "lucide-react";
 
 interface ShowDetailsModalProps {
-  show: Show | null;
+  show: TrackedShow | null;
   isOpen: boolean;
   watchedEpisodes: Record<string, boolean>;
   onClose: () => void;
@@ -244,7 +244,8 @@ export const ShowDetailsModal: React.FC<ShowDetailsModalProps> = ({
 
                         {/* Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {!isCurrent && (
+                          {/* O próximo episódio é sempre um não visto, então só esses podem receber foco. */}
+                          {!isCurrent && !isWatched && (
                             <button
                               onClick={() => onSetCurrentEpisode(show.id, ep)}
                               className="px-2.5 py-1 rounded-md text-[11px] text-[#8b9baa] hover:text-white hover:bg-[#242f38] transition-colors cursor-pointer"

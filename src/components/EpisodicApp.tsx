@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { DiaryLogOptions, Episode, Show, WatchLog, Review, UserProfile, UserList } from "@/types";
+import { DiaryLogOptions, Episode, Show, TrackedShow, WatchLog, Review, UserProfile, UserList } from "@/types";
 import {
   INITIAL_SHOWS,
   INITIAL_REVIEWS,
@@ -10,23 +10,23 @@ import {
   DEMO_WATCHED,
   DEMO_RATINGS,
   DEMO_DIARY,
+  DEMO_EPISODE_CACHE,
 } from "@/lib/catalog";
 import { STORAGE_KEYS, getFromStorage, saveToStorage, migrateLegacyData } from "@/lib/storage";
 import {
+  DEFAULT_RUNTIME,
   EpisodeRef,
   buildPlaceholderEpisode,
-  compareRefs,
   fetchEpisode,
   getAllEpisodeIds,
   getLastEpisodeRef,
-  getNextEpisodeRef,
   getPrevEpisodeRef,
   getSeasonEpisodeIds,
-  getSeasonEpisodeCount,
+  isPlaceholderEpisode,
   makeEpisodeId,
   parseEpisodeId,
   toISODate,
-  withProgress,
+  trackShow,
 } from "@/lib/episodes";
 import { Navbar } from "@/components/Navbar";
 import { UpNextSection } from "@/components/UpNextSection";
@@ -38,7 +38,6 @@ import { EpisodeModal } from "@/components/EpisodeModal";
 import { ShowDetailsModal } from "@/components/ShowDetailsModal";
 import { SearchShowModal } from "@/components/SearchShowModal";
 
-const refOf = (ep: Episode): EpisodeRef => ({ season: ep.seasonNumber, episode: ep.episodeNumber });
 
 /** Padrão dos botões "Marcar Visto" fora da ficha: registra hoje no diário. */
 const DEFAULT_LOG_OPTIONS = (): DiaryLogOptions => ({ save: true, isRewatch: false, date: toISODate(new Date()) });
@@ -54,6 +53,7 @@ function loadStoredData() {
     reviews: getFromStorage<Record<string, Review[]>>(STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS),
     lists: getFromStorage<UserList[]>(STORAGE_KEYS.LISTS, INITIAL_LISTS),
     profile: getFromStorage<UserProfile>(STORAGE_KEYS.PROFILE, INITIAL_USER_PROFILE),
+    episodes: getFromStorage<Record<string, Episode>>(STORAGE_KEYS.EPISODES, DEMO_EPISODE_CACHE),
   };
 }
 
@@ -73,6 +73,8 @@ export default function EpisodicApp() {
   const [diaryLogs, setDiaryLogs] = useState<WatchLog[]>(initialData.diary);
   const [userLists, setUserLists] = useState<UserList[]>(initialData.lists);
   const [profile, setProfile] = useState<UserProfile>(initialData.profile);
+  // Detalhes de episódios já carregados do TMDB (o resto é derivado).
+  const [episodeCache, setEpisodeCache] = useState<Record<string, Episode>>(initialData.episodes);
 
   // Modal States
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
@@ -92,6 +94,7 @@ export default function EpisodicApp() {
     setReviewsMap(data.reviews);
     setUserLists(data.lists);
     setProfile(data.profile);
+    setEpisodeCache(data.episodes);
   }, []);
 
   // Persistência: cada fatia do estado é salva quando muda.
@@ -102,6 +105,36 @@ export default function EpisodicApp() {
   useEffect(() => saveToStorage(STORAGE_KEYS.REVIEWS, reviewsMap), [reviewsMap]);
   useEffect(() => saveToStorage(STORAGE_KEYS.LISTS, userLists), [userLists]);
   useEffect(() => saveToStorage(STORAGE_KEYS.PROFILE, profile), [profile]);
+  useEffect(() => saveToStorage(STORAGE_KEYS.EPISODES, episodeCache), [episodeCache]);
+
+  // Séries com próximo episódio e progresso calculados a partir dos episódios vistos.
+  const trackedShows = useMemo<TrackedShow[]>(
+    () => shows.map((show) => trackShow(show, watchedEpisodes, episodeCache)),
+    [shows, watchedEpisodes, episodeCache]
+  );
+
+  // Busca no TMDB os detalhes dos próximos episódios que ainda são provisórios.
+  const missingKey = trackedShows
+    .filter((s) => s.tmdbId && isPlaceholderEpisode(s.currentEpisode))
+    .map((s) => s.currentEpisode.id)
+    .join(",");
+  useEffect(() => {
+    if (!missingKey) return;
+    let cancelled = false;
+    trackedShows
+      .filter((s) => s.tmdbId && isPlaceholderEpisode(s.currentEpisode))
+      .forEach((show) => {
+        const ep = show.currentEpisode;
+        fetchEpisode(show, { season: ep.seasonNumber, episode: ep.episodeNumber }).then((real) => {
+          if (real && !cancelled) setEpisodeCache((prev) => ({ ...prev, [real.id]: real }));
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Só quando o conjunto de episódios faltando muda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey]);
 
   // Dynamic Statistics (a partir dos episódios realmente marcados)
   const dynamicStats = useMemo(() => {
@@ -113,51 +146,31 @@ export default function EpisodicApp() {
       totalEps++;
       const parsed = parseEpisodeId(id);
       const show = parsed ? showsById.get(parsed.showId) : undefined;
-      minutes += show?.currentEpisode?.runtime || 50;
+      minutes += episodeCache[id]?.runtime || show?.runtime || DEFAULT_RUNTIME;
     });
 
     return {
       totalMinutesWatched: minutes,
       totalEpisodesWatched: totalEps,
-      totalShowsCompleted: shows.filter((s) => s.completed).length,
+      totalShowsCompleted: trackedShows.filter((s) => s.completed).length,
     };
-  }, [watchedEpisodes, shows]);
+  }, [watchedEpisodes, shows, trackedShows, episodeCache]);
 
   const selectedShow = useMemo(
-    () => shows.find((s) => s.id === selectedShowId) ?? null,
-    [shows, selectedShowId]
+    () => trackedShows.find((s) => s.id === selectedShowId) ?? null,
+    [trackedShows, selectedShowId]
   );
 
   // ---------------------------------------------------------------------------
   // Helpers de atualização
   // ---------------------------------------------------------------------------
 
-  /** Substitui uma série na lista recalculando o progresso. */
-  const replaceShow = (updated: Show, watched: Record<string, boolean>) => {
-    setShows((prev) => prev.map((s) => (s.id === updated.id ? withProgress(updated, watched) : s)));
+  const updateShow = (showId: string, changes: Partial<Show>) => {
+    setShows((prev) => prev.map((s) => (s.id === showId ? { ...s, ...changes } : s)));
   };
 
-  /**
-   * Troca o episódio atual por um provisório e, em seguida, busca os dados reais
-   * no TMDB (título, sinopse, imagem). Só aplica se o usuário não tiver mudado
-   * o episódio atual nesse meio-tempo.
-   */
-  const setCurrentEpisodeRef = (show: Show, ref: EpisodeRef, watched: Record<string, boolean>, known?: Episode) => {
-    const episode = known ?? buildPlaceholderEpisode(show, ref);
-    replaceShow({ ...show, completed: false, currentEpisode: episode }, watched);
-    if (known) return;
-    fetchEpisode(show, ref).then((real) => {
-      if (!real) return;
-      setShows((prev) =>
-        prev.map((s) =>
-          s.id === show.id && s.currentEpisode.id === episode.id ? { ...s, currentEpisode: real } : s
-        )
-      );
-    });
-  };
-
-  const markCompleted = (show: Show, watched: Record<string, boolean>) => {
-    replaceShow({ ...show, completed: true }, watched);
+  const rememberEpisode = (episode: Episode) => {
+    if (!isPlaceholderEpisode(episode)) setEpisodeCache((prev) => ({ ...prev, [episode.id]: episode }));
   };
 
   type DiaryExtras = Partial<Pick<WatchLog, "watchedAt" | "isRewatch" | "reviewText" | "hasSpoilers">>;
@@ -184,65 +197,66 @@ export default function EpisodicApp() {
     setDiaryLogs((prev) => prev.filter((l) => l.episodeId !== episodeId || !!l.reviewText?.trim()));
   };
 
+  const makeBulkDiaryEntry = (show: Show, suffix: string, code: string, title: string, text: string): WatchLog => ({
+    id: `log-${suffix}-${Date.now()}`,
+    episodeId: `${show.id}-${suffix}`,
+    showId: show.id,
+    showTitle: show.title,
+    episodeCode: code,
+    episodeTitle: title,
+    posterUrl: show.posterUrl,
+    watchedAt: toISODate(new Date()),
+    reviewText: text,
+    isRewatch: false,
+  });
+
   // ---------------------------------------------------------------------------
-  // Ações de "assistido"
+  // Ações de "assistido": só mudam os episódios vistos (e o foco); o próximo
+  // episódio e o progresso de cada série são recalculados automaticamente.
   // ---------------------------------------------------------------------------
 
-  // Marca/desmarca um episódio qualquer e ajusta o próximo episódio da série.
   const handleToggleWatch = (episode: Episode, log: DiaryLogOptions = DEFAULT_LOG_OPTIONS()) => {
     const isNowWatched = !watchedEpisodes[episode.id];
-    const newWatched = { ...watchedEpisodes };
-    if (isNowWatched) newWatched[episode.id] = true;
-    else delete newWatched[episode.id];
-    setWatchedEpisodes(newWatched);
-
-    const show = shows.find((s) => s.id === episode.showId);
+    setWatchedEpisodes((prev) => {
+      const next = { ...prev };
+      if (isNowWatched) next[episode.id] = true;
+      else delete next[episode.id];
+      return next;
+    });
+    rememberEpisode(episode);
 
     if (isNowWatched && log.save) {
+      const show = shows.find((s) => s.id === episode.showId);
       const entry = makeDiaryEntry(show, episode, { watchedAt: log.date, isRewatch: log.isRewatch });
       setDiaryLogs((prev) => [entry, ...prev]);
     } else if (!isNowWatched) {
       dropUnreviewedLogs(episode.id);
     }
-
-    if (!show) return;
-    const epRef = refOf(episode);
-    const currentRef = refOf(show.currentEpisode);
-
-    if (isNowWatched && !show.completed && compareRefs(epRef, currentRef) >= 0) {
-      // Assistiu o episódio atual (ou um posterior): avança para o seguinte.
-      const next = getNextEpisodeRef(show, epRef);
-      if (next) setCurrentEpisodeRef(show, next, newWatched);
-      else markCompleted(show, newWatched);
-    } else if (!isNowWatched && (show.completed || compareRefs(epRef, currentRef) < 0)) {
-      // Desmarcou um episódio anterior: ele volta a ser o próximo a assistir.
-      setCurrentEpisodeRef(show, epRef, newWatched, { ...episode, showTitle: show.title, network: show.network });
-    } else {
-      replaceShow(show, newWatched);
-    }
   };
 
-  // Rewind Episode (desfaz o último episódio visto)
+  // Desfaz o último episódio visto: ele volta a ser o próximo.
   const handleRewindEpisode = (showId: string) => {
-    const show = shows.find((s) => s.id === showId);
+    const show = trackedShows.find((s) => s.id === showId);
     if (!show) return;
 
-    const prev = show.completed ? getLastEpisodeRef(show) : getPrevEpisodeRef(show, refOf(show.currentEpisode));
+    const current: EpisodeRef = { season: show.currentEpisode.seasonNumber, episode: show.currentEpisode.episodeNumber };
+    const prev = show.completed ? getLastEpisodeRef(show) : getPrevEpisodeRef(show, current);
     if (!prev) return;
 
     const prevId = makeEpisodeId(show.id, prev.season, prev.episode);
-    const newWatched = { ...watchedEpisodes };
-    delete newWatched[prevId];
-    setWatchedEpisodes(newWatched);
+    setWatchedEpisodes((w) => {
+      const next = { ...w };
+      delete next[prevId];
+      return next;
+    });
     dropUnreviewedLogs(prevId);
-    setCurrentEpisodeRef(show, prev, newWatched);
+    updateShow(showId, { focusEpisodeId: prevId });
   };
 
-  // Set specific episode as current in Radar
+  // "Focar no Radar": define a partir de qual episódio seguir.
   const handleSetCurrentEpisode = (showId: string, episode: Episode) => {
-    const show = shows.find((s) => s.id === showId);
-    if (!show) return;
-    setCurrentEpisodeRef(show, refOf(episode), watchedEpisodes, episode);
+    rememberEpisode(episode);
+    updateShow(showId, { focusEpisodeId: episode.id });
   };
 
   // Mark Entire Season as Watched
@@ -250,33 +264,22 @@ export default function EpisodicApp() {
     const show = shows.find((s) => s.id === showId);
     if (!show) return;
 
-    const newWatched = { ...watchedEpisodes };
-    getSeasonEpisodeIds(show, seasonNum).forEach((id) => (newWatched[id] = true));
-    setWatchedEpisodes(newWatched);
+    setWatchedEpisodes((prev) => {
+      const next = { ...prev };
+      getSeasonEpisodeIds(show, seasonNum).forEach((id) => (next[id] = true));
+      return next;
+    });
+    updateShow(showId, { focusEpisodeId: undefined });
 
-    // Só avança se o episódio atual estiver nesta temporada ou antes dela.
-    if (!show.completed && show.currentEpisode.seasonNumber <= seasonNum) {
-      const lastOfSeason = { season: seasonNum, episode: getSeasonEpisodeCount(show, seasonNum) };
-      const next = getNextEpisodeRef(show, lastOfSeason);
-      if (next) setCurrentEpisodeRef(show, next, newWatched);
-      else markCompleted(show, newWatched);
-    } else {
-      replaceShow(show, newWatched);
-    }
-
-    const seasonEntry: WatchLog = {
-      id: `log-season-${Date.now()}`,
-      episodeId: `${showId}-s${seasonNum}`,
-      showId: show.id,
-      showTitle: show.title,
-      episodeCode: `T${seasonNum < 10 ? "0" + seasonNum : seasonNum}`,
-      episodeTitle: `Temporada ${seasonNum} Completa`,
-      posterUrl: show.posterUrl,
-      watchedAt: toISODate(new Date()),
-      reviewText: `Temporada ${seasonNum} inteira marcada como assistida.`,
-      isRewatch: false,
-    };
-    setDiaryLogs((logs) => [seasonEntry, ...logs]);
+    const code = `T${seasonNum < 10 ? "0" + seasonNum : seasonNum}`;
+    const entry = makeBulkDiaryEntry(
+      show,
+      `s${seasonNum}`,
+      code,
+      `Temporada ${seasonNum} Completa`,
+      `Temporada ${seasonNum} inteira marcada como assistida.`
+    );
+    setDiaryLogs((logs) => [entry, ...logs]);
   };
 
   // Mark Entire Show as Watched
@@ -284,24 +287,21 @@ export default function EpisodicApp() {
     const show = shows.find((s) => s.id === showId);
     if (!show) return;
 
-    const newWatched = { ...watchedEpisodes };
-    getAllEpisodeIds(show).forEach((id) => (newWatched[id] = true));
-    setWatchedEpisodes(newWatched);
-    markCompleted(show, newWatched);
+    setWatchedEpisodes((prev) => {
+      const next = { ...prev };
+      getAllEpisodeIds(show).forEach((id) => (next[id] = true));
+      return next;
+    });
+    updateShow(showId, { focusEpisodeId: undefined });
 
-    const showEntry: WatchLog = {
-      id: `log-show-${Date.now()}`,
-      episodeId: `${showId}-full`,
-      showId: show.id,
-      showTitle: show.title,
-      episodeCode: "COMPLETA",
-      episodeTitle: `Todos os ${show.totalEpisodes} episódios`,
-      posterUrl: show.posterUrl,
-      watchedAt: toISODate(new Date()),
-      reviewText: "Série completa assistida e arquivada com sucesso.",
-      isRewatch: false,
-    };
-    setDiaryLogs((logs) => [showEntry, ...logs]);
+    const entry = makeBulkDiaryEntry(
+      show,
+      "full",
+      "COMPLETA",
+      `Todos os ${show.totalEpisodes} episódios`,
+      "Série completa assistida e arquivada com sucesso."
+    );
+    setDiaryLogs((logs) => [entry, ...logs]);
   };
 
   // Remove Show
@@ -423,9 +423,10 @@ export default function EpisodicApp() {
 
   // Open Episode Modal by IDs (a partir do diário)
   const handleSelectEpisodeById = (episodeId: string, showId: string) => {
-    const show = shows.find((s) => s.id === showId);
-    if (show?.currentEpisode?.id === episodeId) {
-      openEpisode(show.currentEpisode);
+    const show = trackedShows.find((s) => s.id === showId);
+    const cached = episodeCache[episodeId];
+    if (cached) {
+      openEpisode(cached);
       return;
     }
 
@@ -440,7 +441,7 @@ export default function EpisodicApp() {
     const placeholder = buildPlaceholderEpisode(show, parsed);
     openEpisode(placeholder);
     fetchEpisode(show, parsed).then((real) => {
-      if (real) setSelectedEpisode((cur) => (cur?.id === real.id ? real : cur));
+      if (real) rememberEpisode(real);
     });
   };
 
@@ -490,7 +491,7 @@ export default function EpisodicApp() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8">
         {activeTab === "upnext" && (
           <UpNextSection
-            shows={shows}
+            shows={trackedShows}
             onSelectEpisode={openEpisode}
             onToggleWatch={handleToggleWatch}
             onMarkSeasonWatched={handleMarkSeasonWatched}
@@ -504,7 +505,7 @@ export default function EpisodicApp() {
 
         {activeTab === "calendar" && (
           <CalendarSection
-            shows={shows}
+            shows={trackedShows}
             watchedEpisodes={watchedEpisodes}
             onSelectEpisode={openEpisode}
             onToggleWatch={handleToggleWatch}
@@ -524,7 +525,7 @@ export default function EpisodicApp() {
         {activeTab === "lists" && (
           <ListsSection
             lists={userLists}
-            shows={shows}
+            shows={trackedShows}
             onCreateList={handleCreateList}
             onDeleteList={handleDeleteList}
             onToggleLikeList={handleToggleLikeList}
@@ -534,7 +535,7 @@ export default function EpisodicApp() {
         {activeTab === "profile" && (
           <ProfileSection
             profile={currentProfile}
-            shows={shows}
+            shows={trackedShows}
             diaryLogs={diaryLogs}
             totalReviewsCount={totalReviewsCount}
             onUpdateProfile={setProfile}
@@ -547,7 +548,7 @@ export default function EpisodicApp() {
       {selectedEpisode && (
         <EpisodeModal
           key={selectedEpisode.id}
-          episode={selectedEpisode}
+          episode={episodeCache[selectedEpisode.id] ?? selectedEpisode}
           isOpen={isEpisodeModalOpen}
           isWatched={!!watchedEpisodes[selectedEpisode.id]}
           userRating={userRatings[selectedEpisode.id] || 0}

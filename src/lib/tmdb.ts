@@ -196,15 +196,10 @@ export async function getTMDBSeasonDetails(tmdbId: number | string, seasonNumber
   };
 }
 
-/** Série completa, pronta para entrar no Radar a partir do S01E01. */
+/** Metadados da série para entrar no Radar. Episódios são buscados sob demanda. */
 export async function getTMDBShowFullDetails(tmdbId: number | string): Promise<Show | null> {
   const showData = await fetchTMDB<TMDBShowDetails>(`/tv/${tmdbId}`);
   if (!showData) return null;
-
-  const id = String(showData.id);
-  const network = showData.networks?.[0]?.name || "Streaming";
-  const backdropUrl = getTMDBImageUrl(showData.backdrop_path, "w1280");
-  const runtime = showData.episode_run_time?.[0];
 
   const seasons: SeasonInfo[] = (showData.seasons || [])
     .filter((s) => s.season_number > 0)
@@ -217,34 +212,19 @@ export async function getTMDBShowFullDetails(tmdbId: number | string): Promise<S
       airDate: s.air_date || "",
     }));
 
-  const firstSeason = seasons[0]?.seasonNumber ?? 1;
-  const seasonData = await fetchTMDB<TMDBSeason>(`/tv/${tmdbId}/season/${firstSeason}`);
-  const firstEpisode: TMDBEpisode = seasonData?.episodes?.[0] ?? { season_number: firstSeason, episode_number: 1 };
-
-  const currentEpisode = toEpisode(
-    { ...firstEpisode, season_number: firstEpisode.season_number ?? firstSeason },
-    { id, title: showData.name, network, backdropUrl, runtime }
-  );
-  // Sem imagem própria do episódio, usa o backdrop da série.
-  if (!firstEpisode.still_path) currentEpisode.backdropUrl = backdropUrl;
-
-  const totalEpisodes = showData.number_of_episodes || seasons.reduce((sum, s) => sum + s.episodeCount, 0);
-
   return {
-    id,
+    id: String(showData.id),
     tmdbId: showData.id,
     title: showData.name,
-    network,
+    network: showData.networks?.[0]?.name || "Streaming",
     firstAirYear: yearOf(showData.first_air_date),
     posterUrl: getTMDBImageUrl(showData.poster_path, "w500"),
-    backdropUrl,
+    backdropUrl: getTMDBImageUrl(showData.backdrop_path, "w1280"),
     overview: showData.overview || "Sem sinopse.",
     totalSeasons: showData.number_of_seasons || seasons.length || 1,
-    totalEpisodes,
-    currentEpisode,
-    progressText: `0 de ${totalEpisodes} episódios (0%)`,
-    progressPercent: 0,
+    totalEpisodes: showData.number_of_episodes || seasons.reduce((sum, s) => sum + s.episodeCount, 0),
     seasons,
+    runtime: showData.episode_run_time?.[0],
   };
 }
 

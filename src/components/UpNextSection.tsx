@@ -2,11 +2,11 @@
 
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
-import { Show, Episode } from "@/types";
+import { Show, Episode, TrackedShow } from "@/types";
 import { Check, Plus, MoreVertical, CheckCheck, Trash2, Sparkles, Layers, RotateCcw } from "lucide-react";
 
 interface UpNextSectionProps {
-  shows: Show[];
+  shows: TrackedShow[];
   onSelectEpisode: (episode: Episode) => void;
   onToggleWatch: (episode: Episode) => void;
   onMarkSeasonWatched: (showId: string, seasonNum: number) => void;
