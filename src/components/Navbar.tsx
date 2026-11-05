@@ -139,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Image width={28} height={28} unoptimized
               src={userAvatar}
               alt="Avatar"
-              className="w-7 h-7 rounded-full object-cover ring-1 ring-[#00e054]"
+              className="w-7 h-7 shrink-0 rounded-full object-cover ring-1 ring-[#00e054]"
             />
           </button>
         </div>

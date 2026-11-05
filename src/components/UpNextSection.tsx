@@ -130,7 +130,7 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sortedActiveShows.map((show) => {
+            {sortedActiveShows.map((show, index) => {
               const ep = show.currentEpisode;
               const isMenuOpen = openMenuShowId === show.id;
 
@@ -146,6 +146,8 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
                       onClick={() => onSelectEpisode(ep)}
                     >
                       <Image fill sizes="(max-width: 768px) 100vw, 33vw"
+                        // Primeiras linhas de cards ficam visíveis ao abrir: carregar já (LCP).
+                        loading={index < 4 ? "eager" : "lazy"}
                         src={ep.stillUrl || show.backdropUrl}
                         alt={show.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

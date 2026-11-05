@@ -72,7 +72,7 @@ export const EpisodeModal: React.FC<EpisodeModalProps> = ({
         
         {/* Modal Hero Header with Backdrop */}
         <div className="relative h-56 sm:h-64 w-full overflow-hidden shrink-0">
-          <Image fill sizes="(max-width: 768px) 100vw, 768px"
+          <Image fill sizes="(max-width: 768px) 100vw, 768px" loading="eager"
             src={episode.backdropUrl || episode.stillUrl}
             alt={episode.title}
             className="w-full h-full object-cover object-center"

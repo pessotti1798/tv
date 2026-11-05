@@ -142,6 +142,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     </button>
   );
 
+  // Os primeiros cards aparecem no topo da página: carregam já (LCP).
+  const eagerKeys = new Set(visibleItems.slice(0, 3).map((i) => i.key));
+
   const renderItem = (item: ReleaseItem) => {
     const { show, episodes, airDate } = item;
     const isSingle = episodes.length === 1;
@@ -161,7 +164,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             className="w-20 h-28 rounded-xl bg-[#2c3642] shrink-0 overflow-hidden cursor-pointer relative"
             onClick={() => (isSingle ? onSelectEpisode(first) : onOpenShowDetails(show))}
           >
-            <Image fill sizes="80px"
+            <Image fill sizes="80px" loading={eagerKeys.has(item.key) ? "eager" : "lazy"}
               src={show.posterUrl}
               alt={show.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

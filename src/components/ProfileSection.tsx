@@ -172,7 +172,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
       {/* Profile Header Card */}
       <div className="bg-[#1b2228] border border-[#2c3642] rounded-2xl p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <Image width={96} height={96} unoptimized
+          <Image width={96} height={96} unoptimized loading="eager"
             src={profile.avatarUrl}
             alt={profile.name}
             className="w-24 h-24 rounded-full object-cover ring-4 ring-[#00e054]/30 shrink-0"
@@ -275,7 +275,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 key={show.id}
                 className="group relative rounded-xl overflow-hidden bg-[#1b2228] border border-[#2c3642] hover:border-[#00e054] transition-all"
               >
-                <Image width={300} height={450}
+                <Image width={300} height={450} loading="eager"
                   src={show.posterUrl}
                   alt={show.title}
                   className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300"

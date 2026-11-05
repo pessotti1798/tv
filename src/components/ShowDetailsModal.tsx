@@ -87,7 +87,7 @@ export const ShowDetailsModal: React.FC<ShowDetailsModalProps> = ({
         
         {/* Header Hero */}
         <div className="relative h-60 sm:h-72 w-full overflow-hidden shrink-0">
-          <Image fill sizes="(max-width: 896px) 100vw, 896px"
+          <Image fill sizes="(max-width: 896px) 100vw, 896px" loading="eager"
             src={show.backdropUrl || show.posterUrl}
             alt={show.title}
             className="w-full h-full object-cover object-center"
