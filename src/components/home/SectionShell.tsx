@@ -14,6 +14,15 @@ export const SECTIONS = [
 
 export type SectionHref = (typeof SECTIONS)[number]["href"];
 
+/**
+ * Seções em construção ficam fora dos menus (as páginas continuam acessíveis
+ * pelo endereço). Para mostrar de novo, troque para `true`.
+ */
+const SHOW_SECTIONS_IN_NAV = false;
+
+/** Seções que aparecem nos menus. */
+export const NAV_SECTIONS = SHOW_SECTIONS_IN_NAV ? SECTIONS : [];
+
 interface SectionShellProps {
   /** Nome da página, em cinza ao lado do "← voltar". */
   title: string;
@@ -48,7 +57,7 @@ export function SectionShell({ title, current, align, backHref = "/", children, 
         <Link href={withAlign("/", align)} className="hover:text-black">
           início
         </Link>
-        {SECTIONS.map(({ href, label }) =>
+        {NAV_SECTIONS.map(({ href, label }) =>
           href === current ? (
             <span key={href} aria-current="page" className="text-black font-normal">
               {label}

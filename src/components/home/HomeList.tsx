@@ -10,7 +10,7 @@ import { AddShowRows } from "./AddShowRows";
 import { LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, statusClass, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 import { useUndo } from "./useUndo";
-import { SECTIONS } from "./SectionShell";
+import { NAV_SECTIONS } from "./SectionShell";
 
 interface Row {
   show: TrackedShow;
@@ -148,7 +148,7 @@ export default function HomeList() {
             concluídas ({completedCount})
           </Link>
         )}
-        {SECTIONS.map(({ href, label }) => (
+        {NAV_SECTIONS.map(({ href, label }) => (
           <Link key={href} href={withAlign(href, align)} className="hover:text-black">
             {label}
           </Link>
