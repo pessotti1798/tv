@@ -12,9 +12,10 @@
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Visual novo: fundo branco e Inter. A interface clássica (/classico) define as próprias cores. */
+  background-color: #ffffff;
+  color: #000000;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -87,4 +88,59 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3b4958;
+}
+
+/*
+ * Inter em tamanho de título: "a" de um andar (cv11), combinado com o
+ * espaçamento mais justo de LIST_TEXT. Teste de design; fácil de remover.
+ */
+.inter-display {
+  font-feature-settings: "cv11" 1;
+}
+
+/*
+ * Animações de "marcar como visto" (lista inicial). Padrão: contador; as outras com ?marcar=subir|digitar|check.
+ * Saída: o episódio atual sai; entrada: o próximo episódio chega.
+ */
+.ep-anim {
+  display: inline-block;
+}
+
+/* subir */
+@keyframes ep-rise-out {
+  to { transform: translateY(-0.45em); opacity: 0; }
+}
+@keyframes ep-rise-in {
+  from { transform: translateY(0.45em); opacity: 0; }
+}
+.ep-rise-out { animation: ep-rise-out 260ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.ep-rise-in { animation: ep-rise-in 340ms cubic-bezier(0, 0, 0.2, 1) both; }
+
+/* contador: o código rola dentro de uma janela; o nome some e volta */
+.ep-roll-window {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+@keyframes ep-roll-out { to { transform: translateY(-105%); } }
+@keyframes ep-roll-in { from { transform: translateY(105%); } }
+@keyframes ep-fade-out { to { opacity: 0; } }
+@keyframes ep-fade-in { from { opacity: 0; } }
+.ep-roll-out { animation: ep-roll-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.ep-roll-in { animation: ep-roll-in 320ms cubic-bezier(0, 0, 0.2, 1) both; }
+.ep-fade-out { animation: ep-fade-out 200ms linear forwards; }
+.ep-fade-in { animation: ep-fade-in 300ms ease-out both; }
+.ep-fade-in-late { animation: ep-fade-in 300ms ease-out 150ms both; }
+
+/* check */
+@keyframes ep-check-in {
+  from { opacity: 0; transform: scale(0.4); }
+}
+.ep-check { display: inline-block; animation: ep-check-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ep-rise-out, .ep-rise-in, .ep-roll-out, .ep-roll-in,
+  .ep-fade-out, .ep-fade-in, .ep-fade-in-late, .ep-check {
+    animation: none;
+  }
 }

@@ -1,4 +1,4 @@
-import { Show, Episode, SeasonInfo, ShowSearchResult } from "@/types";
+import { Show, Episode, SeasonInfo, SeriesExtras, ShowSearchResult } from "@/types";
 import { episodeCode, makeEpisodeId } from "./episodes";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -265,5 +265,85 @@ export async function getTMDBAirSchedule(tmdbId: number | string, since: string)
     status: show.status ?? "",
     nextAirDate: show.next_episode_to_air?.air_date ?? null,
     episodes,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Extras da série: notas externas (OMDb) e onde assistir (TMDB / JustWatch)
+// ---------------------------------------------------------------------------
+
+interface TMDBProvider {
+  provider_name: string;
+  logo_path?: string | null;
+}
+
+interface TMDBShowExtras {
+  vote_average?: number;
+  status?: string;
+  next_episode_to_air?: TMDBEpisode | null;
+  external_ids?: { imdb_id?: string | null };
+  "watch/providers"?: {
+    results?: Record<string, { link?: string; flatrate?: TMDBProvider[] }>;
+  };
+}
+
+interface OMDbResponse {
+  Response?: string;
+  imdbRating?: string;
+  Metascore?: string;
+}
+
+function omdbValue(value?: string): string | null {
+  return value && value !== "N/A" ? value : null;
+}
+
+export async function getSeriesExtras(tmdbId: number | string, region = "BR"): Promise<SeriesExtras | null> {
+  const data = await fetchTMDB<TMDBShowExtras>(`/tv/${tmdbId}`, {
+    append_to_response: "external_ids,watch/providers",
+  });
+  if (!data) return null;
+
+  const imdbId = data.external_ids?.imdb_id || null;
+  const local = data["watch/providers"]?.results?.[region];
+
+  let imdbRating: string | null = null;
+  let metascore: string | null = null;
+  const omdbKey = process.env.OMDB_API_KEY;
+  if (omdbKey && imdbId) {
+    try {
+      const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbKey}`, {
+        next: { revalidate: 86400 }, // notas mudam pouco: cache de 1 dia
+      });
+      if (res.ok) {
+        const omdb = (await res.json()) as OMDbResponse;
+        if (omdb.Response === "True") {
+          imdbRating = omdbValue(omdb.imdbRating);
+          metascore = omdbValue(omdb.Metascore);
+        }
+      }
+    } catch (err) {
+      console.error("OMDb Fetch Error:", err);
+    }
+  }
+
+  return {
+    imdbId,
+    imdbRating,
+    metascore,
+    tmdbRating: data.vote_average ? roundRating(data.vote_average) : null,
+    providers: (local?.flatrate ?? []).map((p) => ({
+      name: p.provider_name,
+      logoUrl: getTMDBImageUrl(p.logo_path, "w300"),
+    })),
+    providersLink: local?.link ?? null,
+    omdbConfigured: !!omdbKey,
+    status: data.status ?? "",
+    nextAirEpisode: data.next_episode_to_air
+      ? {
+          code: episodeCode(data.next_episode_to_air.season_number, data.next_episode_to_air.episode_number),
+          title: data.next_episode_to_air.name || `Episódio ${data.next_episode_to_air.episode_number}`,
+          airDate: data.next_episode_to_air.air_date || null,
+        }
+      : null,
   };
 }

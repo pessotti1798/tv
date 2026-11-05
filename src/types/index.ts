@@ -144,3 +144,21 @@ export interface DiaryLogOptions {
   /** Data em que assistiu, YYYY-MM-DD. */
   date: string;
 }
+
+/** Informações extras da série (notas externas e onde assistir). */
+export interface SeriesExtras {
+  imdbId: string | null;
+  imdbRating: string | null;
+  metascore: string | null;
+  tmdbRating: number | null;
+  /** Serviços de streaming por assinatura no Brasil (TMDB / JustWatch). */
+  providers: { name: string; logoUrl: string }[];
+  /** Página do TMDB com as opções de onde assistir. */
+  providersLink: string | null;
+  /** false quando OMDB_API_KEY não está configurada (sem notas de IMDb/Metacritic). */
+  omdbConfigured: boolean;
+  /** Situação no TMDB, ex.: "Returning Series", "Ended", "Canceled". */
+  status: string;
+  /** Próximo episódio a ser lançado, segundo o TMDB (null se nenhum anunciado). */
+  nextAirEpisode: { code: string; title: string; airDate: string | null } | null;
+}

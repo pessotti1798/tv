@@ -316,8 +316,15 @@ export function daysBetween(a: string, b: string): number {
 export const SHOW_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /** Séries do TMDB que nunca foram sincronizadas ou estão há mais de 24h sem atualizar. */
+/** Imagens que vêm do TMDB (as do demo antigo são fotos genéricas do Unsplash). */
+function isTMDBImage(url: string | undefined): boolean {
+  return !!url && url.startsWith("https://image.tmdb.org/");
+}
+
 export function needsSync(show: Show, now: number = Date.now()): boolean {
   if (!show.tmdbId) return false;
+  // Séries com imagem genérica sincronizam já, para receber o pôster oficial.
+  if (!isTMDBImage(show.posterUrl)) return true;
   const last = show.syncedAt ? Date.parse(show.syncedAt) : NaN;
   return Number.isNaN(last) || now - last > SHOW_SYNC_INTERVAL_MS;
 }
@@ -335,12 +342,20 @@ export async function fetchShowMetadata(show: Show): Promise<Show | null> {
 
 /**
  * Aplica a estrutura vinda do TMDB (temporadas, totais) à série local, sem
- * mexer em título, imagens, foco ou ID. Uma resposta sem temporadas é ignorada.
+ * mexer em título, foco ou ID. Imagens genéricas são trocadas pelas oficiais.
+ * Uma resposta sem temporadas só atualiza as imagens.
  */
 export function mergeShowStructure(local: Show, remote: Show, syncedAt: string): Show {
-  if (!remote.seasons || remote.seasons.length === 0) return { ...local, syncedAt };
+  // Imagens: troca só as genéricas (não-TMDB) pelas oficiais.
+  const images = {
+    posterUrl: !isTMDBImage(local.posterUrl) && isTMDBImage(remote.posterUrl) ? remote.posterUrl : local.posterUrl,
+    backdropUrl:
+      !isTMDBImage(local.backdropUrl) && isTMDBImage(remote.backdropUrl) ? remote.backdropUrl : local.backdropUrl,
+  };
+  if (!remote.seasons || remote.seasons.length === 0) return { ...local, ...images, syncedAt };
   return {
     ...local,
+    ...images,
     seasons: remote.seasons,
     totalSeasons: remote.totalSeasons,
     totalEpisodes: remote.totalEpisodes,
@@ -356,4 +371,50 @@ export function mergeShowStructure(local: Show, remote: Show, syncedAt: string):
 export function hasAired(airDate: string, today: string): boolean {
   if (/^\d{4}-\d{2}-\d{2}$/.test(airDate)) return airDate <= today;
   return airDate !== "—";
+}
+
+// ---------------------------------------------------------------------------
+// Situação de lançamento de um episódio (lista inicial e página da série)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data de estreia como YYYY-MM-DD. Aceita ISO (TMDB) e o texto dos dados demo
+ * ("12 de Maio, 2024"). Retorna null quando não há data conhecida.
+ */
+export function episodeAirISO(ep: Episode): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ep.airDate)) return ep.airDate;
+  const match = /(\d{1,2})\s+de\s+([a-zç]{3})[a-zç]*\.?,?\s+(\d{4})/i.exec(ep.airDate);
+  if (!match) return null;
+  const month = PT_MONTHS.indexOf(match[2].toLowerCase());
+  return month >= 0 ? toISODate(new Date(Number(match[3]), month, Number(match[1]))) : null;
+}
+
+/** Segunda-feira da semana de `today` (YYYY-MM-DD). */
+export function startOfWeekISO(today: string): string {
+  const day = parseISODate(today).getDay(); // 0 = domingo
+  return addDays(today, -((day + 6) % 7));
+}
+
+/**
+ * - "upcoming": ainda não estreou (ou estreia sem data anunciada);
+ * - "this-week": estreou nesta semana (segunda até hoje);
+ * - "aired": estreou antes;
+ * - "unknown": detalhes ainda carregando.
+ */
+export type ReleaseStatus = "upcoming" | "this-week" | "aired" | "unknown";
+
+export function releaseStatus(ep: Episode, today: string): ReleaseStatus {
+  if (isPlaceholderEpisode(ep)) return "unknown";
+  const air = episodeAirISO(ep);
+  if (!air) return ep.airDate === "—" ? "upcoming" : "aired";
+  if (air > today) return "upcoming";
+  return air >= startOfWeekISO(today) ? "this-week" : "aired";
+}
+
+const PT_WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+/** Data curta com dia da semana, ex.: "sáb 8 nov". */
+export function formatShortDay(iso: string): string {
+  const date = parseISODate(iso);
+  return `${PT_WEEKDAYS[date.getDay()]} ${date.getDate()} ${PT_MONTHS[date.getMonth()]}`;
 }
