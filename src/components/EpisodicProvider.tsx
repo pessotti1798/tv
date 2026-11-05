@@ -427,6 +427,35 @@ function useEpisodicState() {
     setDiaryLogs((prev) => prev.filter((l) => l.id !== logId));
   };
 
+  /**
+   * Edita nota, comentário e spoiler de um registro do diário. Se for o registro
+   * mais recente do episódio, a nota também vale como nota atual do episódio.
+   */
+  const handleUpdateLog = (logId: string, patch: Partial<Pick<WatchLog, "rating" | "reviewText" | "hasSpoilers">>) => {
+    const log = diaryLogs.find((l) => l.id === logId);
+    if (!log) return;
+    setDiaryLogs((prev) => prev.map((l) => (l.id === logId ? { ...l, ...patch } : l)));
+    const isLatest = diaryLogs.find((l) => l.episodeId === log.episodeId)?.id === logId;
+    if (isLatest && "rating" in patch) {
+      setUserRatings((prev) => {
+        const next = { ...prev };
+        if (patch.rating && patch.rating > 0) next[log.episodeId] = patch.rating;
+        else delete next[log.episodeId];
+        return next;
+      });
+    }
+  };
+
+  // Devolve um registro apagado à posição original (usado pelo "desfazer").
+  const handleRestoreLog = (log: WatchLog, index: number) => {
+    setDiaryLogs((prev) => {
+      if (prev.some((l) => l.id === log.id)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(index, next.length), 0, log);
+      return next;
+    });
+  };
+
   // List Management
   const handleCreateList = (newList: UserList) => {
     setUserLists((prev) => [newList, ...prev]);
@@ -434,6 +463,10 @@ function useEpisodicState() {
 
   const handleDeleteList = (listId: string) => {
     setUserLists((prev) => prev.filter((l) => l.id !== listId));
+  };
+
+  const handleUpdateList = (listId: string, patch: Partial<Pick<UserList, "title" | "description" | "items">>) => {
+    setUserLists((prev) => prev.map((l) => (l.id === listId ? { ...l, ...patch } : l)));
   };
 
   const handleToggleLikeList = (listId: string) => {
@@ -486,7 +519,10 @@ function useEpisodicState() {
     handleLikeReview,
     handleAddShow,
     handleDeleteLog,
+    handleUpdateLog,
+    handleRestoreLog,
     handleCreateList,
+    handleUpdateList,
     handleDeleteList,
     handleToggleLikeList,
   };

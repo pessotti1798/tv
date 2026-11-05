@@ -10,6 +10,7 @@ import { AddShowRows } from "./AddShowRows";
 import { LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, statusClass, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 import { useUndo } from "./useUndo";
+import { SECTIONS } from "./SectionShell";
 
 interface Row {
   show: TrackedShow;
@@ -49,14 +50,6 @@ function episodeLabel({ show, status, airDate }: Row): string {
   if (status === "upcoming") return `${ep.code} · ${airDate ? formatShortDay(airDate) : "sem data"}`;
   return `${ep.code} ${ep.title}`;
 }
-
-/** Atalhos para as seções que ainda estão só na interface clássica. */
-const CLASSIC_SECTIONS = [
-  { tab: "calendar", label: "calendário" },
-  { tab: "diary", label: "diário" },
-  { tab: "lists", label: "listas" },
-  { tab: "profile", label: "perfil" },
-];
 
 /**
  * Página inicial: séries em andamento e o próximo episódio de cada uma.
@@ -155,8 +148,8 @@ export default function HomeList() {
             concluídas ({completedCount})
           </Link>
         )}
-        {CLASSIC_SECTIONS.map(({ tab, label }) => (
-          <Link key={tab} href={`/classico?aba=${tab}`} className="hover:text-black">
+        {SECTIONS.map(({ href, label }) => (
+          <Link key={href} href={withAlign(href, align)} className="hover:text-black">
             {label}
           </Link>
         ))}
