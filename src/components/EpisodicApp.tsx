@@ -21,8 +21,12 @@ import {
   getAllEpisodeIds,
   getLastEpisodeRef,
   getPrevEpisodeRef,
+  fetchShowMetadata,
   getSeasonEpisodeIds,
+  hasAired,
   isPlaceholderEpisode,
+  mergeShowStructure,
+  needsSync,
   makeEpisodeId,
   parseEpisodeId,
   toISODate,
@@ -135,6 +139,36 @@ export default function EpisodicApp() {
     // Só quando o conjunto de episódios faltando muda.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missingKey]);
+
+  // Ao abrir o app, atualiza a lista de temporadas das séries há mais de 24h sem
+  // sincronizar. Com o modelo derivado, uma temporada nova faz a série voltar
+  // sozinha ao Radar.
+  useEffect(() => {
+    const stale = shows.filter((s) => needsSync(s));
+    if (stale.length === 0) return;
+    let cancelled = false;
+    const today = toISODate(new Date());
+
+    stale.forEach((show) => {
+      fetchShowMetadata(show).then((remote) => {
+        if (cancelled || !remote) return;
+        const syncedAt = new Date().toISOString();
+        setShows((prev) => prev.map((s) => (s.id === show.id ? mergeShowStructure(s, remote, syncedAt) : s)));
+        // Episódios que ainda não foram ao ar mudam (título, data); recarrega depois.
+        setEpisodeCache((prev) =>
+          Object.fromEntries(
+            Object.entries(prev).filter(([, ep]) => ep.showId !== show.id || hasAired(ep.airDate, today))
+          )
+        );
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // Só na abertura do app.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dynamic Statistics (a partir dos episódios realmente marcados)
   const dynamicStats = useMemo(() => {
@@ -403,7 +437,9 @@ export default function EpisodicApp() {
 
   // Add Show from Search Modal
   const handleAddShow = (newShow: Show) => {
-    setShows((prev) => [newShow, ...prev.filter((s) => s.id !== newShow.id)]);
+    // Séries recém-buscadas no TMDB já vêm atualizadas; as do catálogo demo sincronizam na próxima abertura.
+    const show = newShow.id === String(newShow.tmdbId) ? { ...newShow, syncedAt: new Date().toISOString() } : newShow;
+    setShows((prev) => [show, ...prev.filter((s) => s.id !== show.id)]);
   };
 
   // Delete Log from Diary

@@ -46,6 +46,8 @@ export interface Show {
    * primeiro não visto a partir dele. Ausente = segue o último episódio visto.
    */
   focusEpisodeId?: string;
+  /** Última atualização da lista de temporadas pelo TMDB (ISO 8601). */
+  syncedAt?: string;
 }
 
 /**

@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { Show, Episode, TrackedShow } from "@/types";
+import { daysBetween, formatDiaryDate, hasAired, isPlaceholderEpisode, toISODate } from "@/lib/episodes";
 import { Check, Plus, MoreVertical, CheckCheck, Trash2, Sparkles, Layers, RotateCcw } from "lucide-react";
 
 interface UpNextSectionProps {
@@ -30,6 +31,15 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
 }) => {
   const [openMenuShowId, setOpenMenuShowId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<string>("recent");
+  const [today] = useState(() => toISODate(new Date()));
+
+  // Próximo episódio ainda não lançado (ex.: temporada nova anunciada).
+  const isUnreleased = (ep: Episode) => !isPlaceholderEpisode(ep) && !hasAired(ep.airDate, today);
+  const releaseLabel = (ep: Episode) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ep.airDate)) return "Sem data de estreia";
+    const days = daysBetween(today, ep.airDate);
+    return days === 1 ? "Estreia amanhã" : `Estreia em ${days} dias`;
+  };
 
   const toggleMenu = (showId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -49,8 +59,10 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
     } else {
       // Default: recent / natural order
     }
-    return list;
-  }, [activeShows, sortOption]);
+    // Séries esperando episódio novo vão para o fim, mantendo a ordem escolhida.
+    return [...list.filter((s) => !isUnreleased(s.currentEpisode)), ...list.filter((s) => isUnreleased(s.currentEpisode))];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeShows, sortOption, today]);
 
   return (
     <section className="space-y-12 animate-fadeIn">
@@ -237,7 +249,7 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
                     <div className="p-4 space-y-3">
                       <div className="flex items-center justify-between text-xs text-[#8b9baa]">
                         <span>Duração: {ep.runtime} min</span>
-                        <span>Estreia: {ep.airDate}</span>
+                        <span>Estreia: {formatDiaryDate(ep.airDate)}</span>
                       </div>
 
                       <p className="text-xs text-[#8b9baa] line-clamp-2 leading-relaxed">
@@ -280,13 +292,19 @@ export const UpNextSection: React.FC<UpNextSectionProps> = ({
                         Ficha
                       </button>
 
-                      <button
-                        onClick={() => onToggleWatch(ep)}
-                        className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-[#00e054] text-black hover:bg-[#00c749] shadow-sm"
-                      >
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>Marcar Visto</span>
-                      </button>
+                      {isUnreleased(ep) ? (
+                        <span className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#242f38] text-[#ffaa00]">
+                          {releaseLabel(ep)}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => onToggleWatch(ep)}
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-[#00e054] text-black hover:bg-[#00c749] shadow-sm"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Marcar Visto</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 

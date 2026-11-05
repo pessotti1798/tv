@@ -308,3 +308,52 @@ export function addDays(iso: string, days: number): string {
 export function daysBetween(a: string, b: string): number {
   return Math.round((parseISODate(b).getTime() - parseISODate(a).getTime()) / 86_400_000);
 }
+
+// ---------------------------------------------------------------------------
+// Sincronização da estrutura da série (temporadas e episódios) com o TMDB
+// ---------------------------------------------------------------------------
+
+export const SHOW_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** Séries do TMDB que nunca foram sincronizadas ou estão há mais de 24h sem atualizar. */
+export function needsSync(show: Show, now: number = Date.now()): boolean {
+  if (!show.tmdbId) return false;
+  const last = show.syncedAt ? Date.parse(show.syncedAt) : NaN;
+  return Number.isNaN(last) || now - last > SHOW_SYNC_INTERVAL_MS;
+}
+
+export async function fetchShowMetadata(show: Show): Promise<Show | null> {
+  if (!show.tmdbId) return null;
+  try {
+    const res = await fetch(`/api/tmdb/show/${show.tmdbId}`);
+    if (!res.ok) return null;
+    return ((await res.json()) as { show?: Show }).show ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Aplica a estrutura vinda do TMDB (temporadas, totais) à série local, sem
+ * mexer em título, imagens, foco ou ID. Uma resposta sem temporadas é ignorada.
+ */
+export function mergeShowStructure(local: Show, remote: Show, syncedAt: string): Show {
+  if (!remote.seasons || remote.seasons.length === 0) return { ...local, syncedAt };
+  return {
+    ...local,
+    seasons: remote.seasons,
+    totalSeasons: remote.totalSeasons,
+    totalEpisodes: remote.totalEpisodes,
+    runtime: local.runtime ?? remote.runtime,
+    syncedAt,
+  };
+}
+
+/**
+ * Se o episódio já foi ao ar. Datas ISO são comparadas com hoje; "—" (sem data)
+ * conta como não lançado; textos antigos (dados demo) contam como lançados.
+ */
+export function hasAired(airDate: string, today: string): boolean {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(airDate)) return airDate <= today;
+  return airDate !== "—";
+}
