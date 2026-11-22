@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { exportBackupData, importBackupData, resetToDemoData } from "@/lib/storage";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, homeGrid, leftText, withAlign } from "./styles";
+import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, homeGrid, leftText, seriesHref, withAlign } from "./styles";
 import { ACTION, SectionShell } from "./SectionShell";
 import { EditableText } from "./EditableText";
 import { useLeftAlign } from "./useLeftAlign";
@@ -157,7 +157,7 @@ export default function ProfilePage() {
               {favorites.map((show) => (
                 <Link
                   key={show.id}
-                  href={withAlign(`/serie/${encodeURIComponent(show.id)}`, align)}
+                  href={seriesHref(show.id, align)}
                   className="self-start hover:underline underline-offset-[0.18em]"
                 >
                   {show.title}

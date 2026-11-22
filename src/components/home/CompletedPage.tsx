@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { Show } from "@/types";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { DETAIL_TEXT, GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
+import { DETAIL_TEXT, GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, seriesHref, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 
 /** "N temporadas · N episódios". */
@@ -43,7 +43,7 @@ export default function CompletedPage() {
             completed.map((show) => (
               <div key={show.id} className="contents">
                 <Link
-                  href={withAlign(`/serie/${encodeURIComponent(show.id)}`, align)}
+                  href={seriesHref(show.id, align)}
                   className={`${leftText(align)} break-words decoration-1 underline-offset-[0.18em] hover:underline`}
                 >
                   {show.title}

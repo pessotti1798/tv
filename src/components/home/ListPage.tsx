@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ListItem, Show } from "@/types";
 import { parseEpisodeId } from "@/lib/episodes";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
+import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, seriesHref, withAlign } from "./styles";
 import { ACTION, SectionShell } from "./SectionShell";
 import { EditableText } from "./EditableText";
 import { listSummary } from "./ListsPage";
@@ -88,7 +88,7 @@ export default function ListPage({ id }: { id: string }) {
             <div key={item.id} className="contents">
               {showId ? (
                 <Link
-                  href={withAlign(`/serie/${encodeURIComponent(showId)}`, align)}
+                  href={seriesHref(showId, align)}
                   className={`${leftText(align)} break-words decoration-1 underline-offset-[0.18em] hover:underline`}
                 >
                   {item.title}

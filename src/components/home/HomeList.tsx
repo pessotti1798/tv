@@ -7,7 +7,7 @@ import { TrackedShow } from "@/types";
 import { ReleaseStatus, episodeAirISO, formatShortDay, releaseStatus, toISODate } from "@/lib/episodes";
 import { useEpisodic } from "@/components/EpisodicProvider";
 import { AddShowRows } from "./AddShowRows";
-import { LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, statusClass, withAlign } from "./styles";
+import { LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, seriesHref, statusClass, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 import { useUndo } from "./useUndo";
 import { NAV_SECTIONS } from "./SectionShell";
@@ -91,7 +91,7 @@ export default function HomeList() {
     );
   };
 
-  const seriesHref = (show: TrackedShow) => withAlign(`/serie/${encodeURIComponent(show.id)}`, align);
+  const showHref = (show: TrackedShow) => seriesHref(show.id, align);
 
   return (
     <main className="min-h-screen bg-white text-black flex flex-col items-center px-4">
@@ -106,7 +106,7 @@ export default function HomeList() {
               // `contents` mantém as duas células na grade.
               <div key={show.id} className="contents">
                 <Link
-                  href={seriesHref(show)}
+                  href={showHref(show)}
                   className={`${cls} ${leftText(align)} break-words decoration-1 underline-offset-[0.18em] hover:underline`}
                 >
                   {show.title}

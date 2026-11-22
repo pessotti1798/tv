@@ -17,6 +17,7 @@ import {
   trackShow,
 } from "@/lib/episodes";
 import { useEpisodic } from "@/components/EpisodicProvider";
+import { getSeriesExtras, getTMDBShowFullDetails } from "@/lib/tmdb";
 import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, LeftAlign, leftItems, leftText, pageGrid, statusClass, withAlign } from "./styles";
 import { useLeftAlign } from "./useLeftAlign";
 import { useUndo } from "./useUndo";
@@ -61,8 +62,7 @@ function usePreviewShow(id: string, enabled: boolean) {
   useEffect(() => {
     if (!enabled || !isTmdbId) return;
     let cancelled = false;
-    fetch(`/api/tmdb/show/${id}`)
-      .then(async (res) => (res.ok ? ((await res.json()).show as Show) : null))
+    getTMDBShowFullDetails(id)
       .catch(() => null)
       .then((show) => {
         if (!cancelled) setResult({ id, show });
@@ -84,8 +84,7 @@ function useExtras(tmdbId: number | undefined) {
   useEffect(() => {
     if (!tmdbId) return;
     let cancelled = false;
-    fetch(`/api/tmdb/extras/${tmdbId}`)
-      .then(async (res) => (res.ok ? ((await res.json()).extras as SeriesExtras) : null))
+    getSeriesExtras(tmdbId)
       .catch(() => null)
       .then((data) => !cancelled && setExtras({ id: tmdbId, data }));
     return () => {

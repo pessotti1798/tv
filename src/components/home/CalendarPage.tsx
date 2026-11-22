@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Episode, Show } from "@/types";
 import { ShowSchedule, daysBetween, fetchSchedule, formatShortDay, startOfWeekISO, toISODate } from "@/lib/episodes";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
+import { GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, seriesHref } from "./styles";
 import { SectionShell } from "./SectionShell";
 import { useLeftAlign } from "./useLeftAlign";
 
@@ -94,7 +94,7 @@ export default function CalendarPage() {
 
   const seriesLink = (show: Show) => (
     <Link
-      href={withAlign(`/serie/${encodeURIComponent(show.id)}`, align)}
+      href={seriesHref(show.id, align)}
       className="decoration-1 underline-offset-[0.18em] hover:underline"
     >
       {show.title}

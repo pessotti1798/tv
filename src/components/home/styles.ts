@@ -88,6 +88,18 @@ export function pageGrid(align: LeftAlign): string {
 /** Espaço extra abaixo de cada item quando as colunas estão empilhadas (celular). */
 export const STACKED_ROW_GAP = "mb-[0.55em] min-[480px]:mb-0";
 
+/**
+ * Endereços das páginas de série e de lista. O site é estático (GitHub Pages),
+ * então o ID vai na query em vez de num segmento de caminho.
+ */
+export function seriesHref(id: string | number, align: LeftAlign): string {
+  return withAlign(`/serie/?id=${encodeURIComponent(String(id))}`, align);
+}
+
+export function listHref(id: string, align: LeftAlign): string {
+  return withAlign(`/lista/?id=${encodeURIComponent(id)}`, align);
+}
+
 /** Mantém o parâmetro de teste ao navegar entre páginas. */
 export function withAlign(href: string, align: LeftAlign): string {
   if (align !== "left") return href;

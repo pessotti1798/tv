@@ -1,4 +1,6 @@
 import { Episode, SeasonInfo, Show, TrackedShow } from "@/types";
+import { episodeCode, makeEpisodeId, pad2 } from "./episode-id";
+import { getTMDBAirSchedule, getTMDBSeasonDetails, getTMDBShowFullDetails } from "./tmdb";
 
 /** Posição de um episódio dentro da série. */
 export interface EpisodeRef {
@@ -9,18 +11,7 @@ export interface EpisodeRef {
 export const DEFAULT_RUNTIME = 50;
 const PLACEHOLDER_OVERVIEW = "Sinopse ainda não carregada.";
 
-export function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-export function episodeCode(season: number, episode: number): string {
-  return `S${pad2(season)}E${pad2(episode)}`;
-}
-
-/** Formato canônico de ID de episódio: `${showId}-${temporada}-${episódio}`. */
-export function makeEpisodeId(showId: string, season: number, episode: number): string {
-  return `${showId}-${season}-${episode}`;
-}
+export { pad2, episodeCode, makeEpisodeId };
 
 /** Faz o caminho inverso de makeEpisodeId. O showId pode conter hífens. */
 export function parseEpisodeId(id: string): ({ showId: string } & EpisodeRef) | null {
@@ -227,9 +218,7 @@ export async function fetchSeason(show: Show, season: number): Promise<SeasonInf
   const key = `${show.tmdbId}-${season}`;
   let pending = seasonCache.get(key);
   if (!pending) {
-    pending = fetch(`/api/tmdb/season/${show.tmdbId}/${season}`)
-      .then(async (res) => (res.ok ? ((await res.json()).season as SeasonInfo) : null))
-      .catch(() => null);
+    pending = getTMDBSeasonDetails(show.tmdbId, season).catch(() => null);
     seasonCache.set(key, pending);
     // Não guarda falhas no cache, para tentar de novo depois.
     pending.then((result) => {
@@ -263,9 +252,7 @@ export async function fetchSchedule(show: Show, since: string): Promise<ShowSche
   const key = `${show.tmdbId}-${since}`;
   let pending = scheduleCache.get(key);
   if (!pending) {
-    pending = fetch(`/api/tmdb/schedule/${show.tmdbId}?since=${since}`)
-      .then(async (res) => (res.ok ? ((await res.json()).schedule as ShowSchedule) : null))
-      .catch(() => null);
+    pending = getTMDBAirSchedule(show.tmdbId, since).catch(() => null);
     scheduleCache.set(key, pending);
     pending.then((result) => {
       if (!result) scheduleCache.delete(key);
@@ -322,9 +309,7 @@ export function needsSync(show: Show, now: number = Date.now()): boolean {
 export async function fetchShowMetadata(show: Show): Promise<Show | null> {
   if (!show.tmdbId) return null;
   try {
-    const res = await fetch(`/api/tmdb/show/${show.tmdbId}`);
-    if (!res.ok) return null;
-    return ((await res.json()) as { show?: Show }).show ?? null;
+    return await getTMDBShowFullDetails(show.tmdbId);
   } catch {
     return null;
   }

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Show, ShowSearchResult } from "@/types";
+import { ShowSearchResult } from "@/types";
 import { useEpisodic } from "@/components/EpisodicProvider";
+import { getTMDBShowFullDetails, searchTMDBShows } from "@/lib/tmdb";
 import { GRAY, LIGHT_GRAY, LeftAlign, leftText } from "./styles";
 
 const MAX_RESULTS = 8;
@@ -27,8 +28,7 @@ export function AddShowRows({ align }: { align: LeftAlign }) {
     const timer = setTimeout(async () => {
       let items: ShowSearchResult[] = [];
       try {
-        const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(trimmed)}`);
-        if (res.ok) items = ((await res.json()).results as ShowSearchResult[]) ?? [];
+        items = await searchTMDBShows(trimmed);
       } catch {
         // Sem conexão ou TMDB fora: a lista fica vazia.
       }
@@ -50,10 +50,9 @@ export function AddShowRows({ align }: { align: LeftAlign }) {
     setAddingId(item.tmdbId);
     setError(null);
     try {
-      const res = await fetch(`/api/tmdb/show/${item.tmdbId}`);
-      const data = (await res.json()) as { show?: Show };
-      if (!data.show) throw new Error("sem dados");
-      handleAddShow(data.show);
+      const show = await getTMDBShowFullDetails(item.tmdbId);
+      if (!show) throw new Error("sem dados");
+      handleAddShow(show);
       close();
     } catch {
       setError("não foi possível adicionar");

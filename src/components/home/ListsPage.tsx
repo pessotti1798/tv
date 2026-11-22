@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserList } from "@/types";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
+import { GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, listHref } from "./styles";
 import { SectionShell } from "./SectionShell";
 import { useLeftAlign } from "./useLeftAlign";
 
@@ -37,7 +37,7 @@ export default function ListsPage() {
       createdAt: new Date().toISOString().slice(0, 10),
     };
     handleCreateList(list);
-    router.push(withAlign(`/listas/${list.id}`, align));
+    router.push(listHref(list.id, align));
   };
 
   return (
@@ -46,7 +46,7 @@ export default function ListsPage() {
         {userLists.map((list) => (
           <div key={list.id} className="contents">
             <Link
-              href={withAlign(`/listas/${list.id}`, align)}
+              href={listHref(list.id, align)}
               className={`${leftText(align)} break-words decoration-1 underline-offset-[0.18em] hover:underline`}
             >
               {list.title}

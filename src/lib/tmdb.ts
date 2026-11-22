@@ -1,5 +1,5 @@
 import { Show, Episode, SeasonInfo, SeriesExtras, ShowSearchResult } from "@/types";
-import { episodeCode, makeEpisodeId } from "./episodes";
+import { episodeCode, makeEpisodeId } from "./episode-id";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -80,38 +80,50 @@ export function getTMDBImageUrl(path: string | null | undefined, size: "w300" | 
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
 }
 
-export async function fetchTMDB<T>(endpoint: string, params: Record<string, string> = {}): Promise<T | null> {
-  const apiKey = process.env.TMDB_API_KEY;
-  const token = process.env.TMDB_ACCESS_TOKEN;
+/**
+ * As chamadas ao TMDB saem direto do navegador (o site é estático, sem servidor).
+ * As chaves são lidas no build (variáveis NEXT_PUBLIC_*) e ficam visíveis no
+ * código publicado: use uma chave gratuita e só de leitura.
+ */
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_ACCESS_TOKEN = process.env.NEXT_PUBLIC_TMDB_ACCESS_TOKEN;
+const OMDB_API_KEY = process.env.NEXT_PUBLIC_OMDB_API_KEY;
 
-  if (!apiKey && !token) {
-    console.warn("TMDB: Nenhuma chave ou token de API configurado em .env.local");
+/** Respostas em memória (por abertura da página); falhas não ficam guardadas. */
+const responseCache = new Map<string, Promise<unknown | null>>();
+
+export async function fetchTMDB<T>(endpoint: string, params: Record<string, string> = {}): Promise<T | null> {
+  if (!TMDB_API_KEY && !TMDB_ACCESS_TOKEN) {
+    console.warn("TMDB: nenhuma chave configurada (NEXT_PUBLIC_TMDB_API_KEY)");
     return null;
   }
 
   const query = new URLSearchParams(params);
-  if (apiKey && !token) query.set("api_key", apiKey);
+  if (TMDB_API_KEY && !TMDB_ACCESS_TOKEN) query.set("api_key", TMDB_API_KEY);
   query.set("language", "pt-BR");
+  const url = `${TMDB_BASE_URL}${endpoint}?${query.toString()}`;
 
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`${TMDB_BASE_URL}${endpoint}?${query.toString()}`, {
-      headers,
-      next: { revalidate: 3600 }, // cache de 1 hora no Next.js
+  let pending = responseCache.get(url);
+  if (!pending) {
+    const headers: HeadersInit = TMDB_ACCESS_TOKEN ? { Authorization: `Bearer ${TMDB_ACCESS_TOKEN}` } : {};
+    pending = fetch(url, { headers })
+      .then(async (res) => {
+        if (!res.ok) {
+          console.error(`TMDB Error ${res.status} em ${endpoint}`);
+          return null;
+        }
+        return (await res.json()) as unknown;
+      })
+      .catch((err) => {
+        console.error("TMDB Fetch Error:", err);
+        return null;
+      });
+    responseCache.set(url, pending);
+    pending.then((result) => {
+      if (result === null) responseCache.delete(url);
     });
-
-    if (!res.ok) {
-      console.error(`TMDB Error ${res.status}: ${await res.text()}`);
-      return null;
-    }
-
-    return (await res.json()) as T;
-  } catch (err) {
-    console.error("TMDB Fetch Error:", err);
-    return null;
   }
+  return (await pending) as T | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,12 +350,10 @@ export async function getSeriesExtras(tmdbId: number | string, region = "BR"): P
 
   let imdbRating: string | null = null;
   let metascore: string | null = null;
-  const omdbKey = process.env.OMDB_API_KEY;
+  const omdbKey = OMDB_API_KEY;
   if (omdbKey && imdbId) {
     try {
-      const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbKey}`, {
-        next: { revalidate: 86400 }, // notas mudam pouco: cache de 1 dia
-      });
+      const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbKey}`);
       if (res.ok) {
         const omdb = (await res.json()) as OMDbResponse;
         if (omdb.Response === "True") {

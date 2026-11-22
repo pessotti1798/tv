@@ -4,8 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Show, ShowSearchResult } from "@/types";
 import { parseEpisodeId } from "@/lib/episodes";
+import { getTMDBRecentReleases, getTMDBShowFullDetails } from "@/lib/tmdb";
 import { useEpisodic } from "@/components/EpisodicProvider";
-import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, withAlign } from "./styles";
+import { DETAIL_TEXT, GRAY, LIGHT_GRAY, LIST_TEXT, STACKED_ROW_GAP, homeGrid, leftText, seriesHref, withAlign } from "./styles";
 import { seasonSummary } from "./CompletedPage";
 import { useLeftAlign } from "./useLeftAlign";
 
@@ -52,15 +53,14 @@ export default function ReleasesPage() {
     if (!needsMore) return;
     let cancelled = false;
     const page = fetched.page + 1;
-    fetch(`/api/tmdb/releases?page=${page}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { results?: ShowSearchResult[]; totalPages?: number }) => {
+    getTMDBRecentReleases(page)
+      .then((data) => {
         if (cancelled) return;
         setPool((prev) => {
           const seen = new Set(prev.map((s) => s.tmdbId));
-          return [...prev, ...(data.results ?? []).filter((s) => !seen.has(s.tmdbId))];
+          return [...prev, ...data.results.filter((s) => !seen.has(s.tmdbId))];
         });
-        setFetched({ page, totalPages: data.totalPages ?? 0 });
+        setFetched({ page, totalPages: data.totalPages });
       })
       .catch(() => !cancelled && setFailed(true));
     return () => {
@@ -83,8 +83,7 @@ export default function ReleasesPage() {
     if (!missingKey) return;
     let cancelled = false;
     missingKey.split(",").forEach((tmdbId) => {
-      fetch(`/api/tmdb/show/${tmdbId}`)
-        .then(async (res) => (res.ok ? ((await res.json()).show as Show) : null))
+      getTMDBShowFullDetails(tmdbId)
         .catch(() => null)
         .then((show) => !cancelled && setDetails((prev) => ({ ...prev, [Number(tmdbId)]: show })));
     });
@@ -109,7 +108,7 @@ export default function ReleasesPage() {
             return (
               <div key={item.tmdbId} className="contents">
                 <Link
-                  href={withAlign(`/serie/${item.tmdbId}`, align)}
+                  href={seriesHref(item.tmdbId, align)}
                   className={`${leftText(align)} break-words decoration-1 underline-offset-[0.18em] hover:underline`}
                 >
                   {item.title}
